@@ -89,7 +89,7 @@ export default function App() {
 
   if (view === "fullscreen" && fullId) {
     const cam = cameras.find((c) => c.id === fullId);
-    const src = `http://localhost:8080/streams/${fullId}/index.m3u8`;
+    const src = `/streams/${fullId}/index.m3u8`;
     return (
       <div className="fullscreen">
         <HlsPlayer src={src} className="video-full" />

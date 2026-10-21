@@ -69,7 +69,11 @@ export async function cameraRoutes(app: FastifyInstance) {
   app.get("/api/cameras/:id/stream", { preHandler: requireAuth }, async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!getCamera(id)) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
-    await streamManager.ensureRunning(id);
+    const secret = getCameraWithSecret(id);
+    const rtspUrl = secret
+      ? `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.dto.ip}:554${secret.dto.channel === "sd" ? "/stream2" : "/stream1"}`
+      : "";
+    await streamManager.ensureRunning(id, rtspUrl);
     const base = `${req.protocol}://${req.headers.host}`;
     return {
       hlsUrl: `${base}/streams/${id}/index.m3u8`,

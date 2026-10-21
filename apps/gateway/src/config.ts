@@ -9,3 +9,10 @@ export const config = {
   logLevel: process.env.LOG_LEVEL ?? "info",
   nodeEnv: process.env.NODE_ENV ?? "development",
 };
+
+if (!process.env.JWT_SECRET) {
+  console.warn("[config] JWT_SECRET not set; using insecure dev secret. Set JWT_SECRET in production.");
+}
+if (!process.env.MASTER_KEY) {
+  console.warn("[config] MASTER_KEY not set; using insecure dev key. Set MASTER_KEY in production.");
+}

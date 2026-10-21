@@ -22,9 +22,9 @@ export class StreamManager {
     return s;
   }
 
-  async ensureRunning(cameraId: string): Promise<FfmpegStream> {
+  async ensureRunning(cameraId: string, rtspUrl: string): Promise<FfmpegStream> {
     const s = this.get(cameraId);
-    if (!s.isRunning()) s.start();
+    if (!s.isRunning()) s.start(rtspUrl);
     this.resetIdle(cameraId);
     return s;
   }

@@ -2,7 +2,7 @@ import { spawn, ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
-import { getCameraWithSecret } from "../repositories/cameras.js";
+// No direct repository dependency (Clean Architecture: media layer receives URL)
 
 export interface StreamHealth {
   status: "starting" | "running" | "stopped" | "error";
@@ -28,17 +28,17 @@ export class FfmpegStream {
     return path.join(this.outputDir, "index.m3u8");
   }
 
-  start() {
+  private currentUrl: string | null = null;
+
+  start(rtspUrl?: string) {
     if (this.proc) return;
     this.stopping = false;
-    const secret = getCameraWithSecret(this.cameraId);
-    if (!secret) {
-      this.health = { ...this.health, status: "error", lastError: "Camera not found" };
+    if (rtspUrl) this.currentUrl = rtspUrl;
+    const url = this.currentUrl;
+    if (!url) {
+      this.health = { ...this.health, status: "error", lastError: "Missing RTSP URL" };
       return;
     }
-    // Pick stream by channel
-    const streamPath = secret.dto.channel === "sd" ? "/stream2" : "/stream1";
-    const url = `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.dto.ip}:554${streamPath}`;
 
     fs.mkdirSync(this.outputDir, { recursive: true });
     // clean old segments
@@ -99,7 +99,7 @@ export class FfmpegStream {
     const delay = Math.min(1000 * Math.pow(2, this.restarts), 30000);
     this.restarts++;
     this.health.restarts = this.restarts;
-    this.restartTimer = setTimeout(() => this.start(), delay);
+    this.restartTimer = setTimeout(() => this.start(this.currentUrl ?? undefined), delay);
   }
 
   stop() {
