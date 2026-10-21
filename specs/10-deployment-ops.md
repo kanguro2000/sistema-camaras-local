@@ -2,6 +2,7 @@
 
 ## 1. Requisitos de hardware (gateway)
 
+- Servidor objetivo: laptop Lenovo G480 con Ubuntu (gateway + mediamtx en Docker).
 - PC/Raspberry Pi 4 / NAS con Docker.
 - CPU: 2+ cores (transcode ocasional).
 - RAM: 2 GB mínimo, 4 GB recomendado.
