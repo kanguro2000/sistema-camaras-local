@@ -4,21 +4,28 @@ import fastifyStatic from "@fastify/static";
 import path from "node:path";
 import fs from "node:fs";
 import { config } from "./config.js";
-import { getDb } from "./db.js";
-import { authRoutes } from "./routes/auth.js";
-import { cameraRoutes } from "./routes/cameras.js";
-import { streamManager } from "./media/stream-manager.js";
-import { getCameraWithSecret } from "./repositories/cameras.js";
+import { getDatabase } from "./infrastructure/db/sqlite.database.js";
+import { SqliteUserRepository } from "./infrastructure/repositories/sqlite-user.repository.js";
+import { SqliteCameraRepository } from "./infrastructure/repositories/sqlite-camera.repository.js";
+import { AuthService } from "./application/services/auth.service.js";
+import { CameraService } from "./application/services/camera.service.js";
+import { authRoutesFactory } from "./interfaces/http/routes/auth.routes.js";
+import { cameraRoutesFactory } from "./interfaces/http/routes/camera.routes.js";
+import { streamManager } from "./infrastructure/media/stream-manager.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: { level: config.logLevel } });
 
-  getDb();
+  getDatabase();
   fs.mkdirSync(path.resolve("./data/streams"), { recursive: true });
+
+  const userRepo = new SqliteUserRepository();
+  const cameraRepo = new SqliteCameraRepository();
+  const auth = new AuthService(userRepo);
+  const cameras = new CameraService(cameraRepo);
 
   await app.register(cors, { origin: true, credentials: true });
 
-  // Serve HLS segments produced by ffmpeg
   await app.register(fastifyStatic, {
     root: path.resolve("./data/streams"),
     prefix: "/streams/",
@@ -32,23 +39,18 @@ export async function buildApp() {
     time: new Date().toISOString(),
   }));
 
-  await app.register(async (instance) => {
-    await authRoutes(instance);
-    await cameraRoutes(instance);
-  });
+  await app.register(authRoutesFactory(auth));
+  await app.register(cameraRoutesFactory(cameras));
 
-  // Start stream on demand when HLS playlist is requested
   app.get("/streams/:cameraId/index.m3u8", async (req, reply) => {
     const { cameraId } = req.params as { cameraId: string };
-    const secret = getCameraWithSecret(cameraId);
+    const secret = cameraRepo.getWithSecret(cameraId);
     const rtspUrl = secret
-      ? `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.dto.ip}:554${secret.dto.channel === "sd" ? "/stream2" : "/stream1"}`
+      ? `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.camera.ip}:554${secret.camera.channel === "sd" ? "/stream2" : "/stream1"}`
       : "";
     await streamManager.ensureRunning(cameraId, rtspUrl);
     streamManager.resetIdle(cameraId);
-    // Wait briefly for first segment
     const stream = streamManager.get(cameraId);
-    const fs = await import("node:fs");
     const waitUntil = Date.now() + 4000;
     while (!fs.existsSync(stream.hlsPath) && Date.now() < waitUntil) {
       await new Promise((r) => setTimeout(r, 200));
@@ -62,9 +64,9 @@ export async function buildApp() {
   app.get("/streams/:cameraId/:file", async (req, reply) => {
     const { cameraId, file } = req.params as { cameraId: string; file: string };
     if (file.endsWith(".m3u8")) {
-      const secret = getCameraWithSecret(cameraId);
+      const secret = cameraRepo.getWithSecret(cameraId);
       const rtspUrl = secret
-        ? `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.dto.ip}:554${secret.dto.channel === "sd" ? "/stream2" : "/stream1"}`
+        ? `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.camera.ip}:554${secret.camera.channel === "sd" ? "/stream2" : "/stream1"}`
         : "";
       await streamManager.ensureRunning(cameraId, rtspUrl);
     }

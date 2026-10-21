@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { config } from "./config.js";
+import { config } from "../../config.js";
 
 const ALG = "aes-256-gcm";
 
@@ -7,12 +7,10 @@ function getKey(): Buffer {
   if (config.masterKey) {
     const buf = Buffer.from(config.masterKey, "base64");
     if (buf.length === 32) return buf;
-    // allow hex
     const hex = Buffer.from(config.masterKey, "hex");
     if (hex.length === 32) return hex;
     throw new Error("MASTER_KEY must be 32 bytes (base64 or hex)");
   }
-  // Dev fallback (NOT for production)
   console.warn("[crypto] MASTER_KEY not set; using insecure dev key. Set MASTER_KEY in production.");
   return crypto.createHash("sha256").update("dev-insecure-key").digest();
 }
@@ -36,9 +34,4 @@ export function decrypt(payload: string): string {
   decipher.setAuthTag(tag);
   const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
   return dec.toString("utf8");
-}
-
-export function maskSecret(s: string): string {
-  if (s.length <= 4) return "****";
-  return "*".repeat(s.length - 4) + s.slice(-4);
 }

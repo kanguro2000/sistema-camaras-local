@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { getCameraWithSecret } from "../repositories/cameras.js";
 
 export interface ProbeResult {
   ok: boolean;
@@ -10,20 +9,16 @@ export interface ProbeResult {
   error?: string;
 }
 
-export function probeCamera(cameraId: string): Promise<ProbeResult> {
+export function probeRtsp(rtspUrl: string): Promise<ProbeResult> {
   return new Promise((resolve) => {
-    const secret = getCameraWithSecret(cameraId);
-    if (!secret) {
-      resolve({ ok: false, error: "Camera not found" });
+    if (!rtspUrl) {
+      resolve({ ok: false, error: "Missing RTSP URL" });
       return;
     }
-    const streamPath = secret.dto.channel === "sd" ? "/stream2" : "/stream1";
-    const url = `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.dto.ip}:554${streamPath}`;
-
     const ffprobe = spawn("ffprobe", [
       "-v", "error",
       "-rtsp_transport", "tcp",
-      "-i", url,
+      "-i", rtspUrl,
       "-show_streams",
       "-of", "json",
     ]);

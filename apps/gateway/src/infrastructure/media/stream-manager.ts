@@ -1,6 +1,6 @@
 import { FfmpegStream } from "./ffmpeg-stream.js";
 import path from "node:path";
-import { config } from "../config.js";
+import { config } from "../../config.js";
 
 const IDLE_TIMEOUT_MS = 30_000;
 

@@ -1,14 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
-import bcrypt from "bcryptjs";
-import { config } from "./config.js";
+import { config } from "../../config.js";
 
-export type Db = DatabaseSync;
+let dbInstance: DatabaseSync | null = null;
 
-let dbInstance: Db | null = null;
-
-export function getDb(): Db {
+export function getDatabase(): DatabaseSync {
   if (dbInstance) return dbInstance;
   const dir = path.dirname(path.resolve(config.dbPath));
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -16,12 +13,11 @@ export function getDb(): Db {
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA foreign_keys = ON;");
   migrate(db);
-  seedAdmin(db);
   dbInstance = db;
   return db;
 }
 
-function migrate(db: Db) {
+function migrate(db: DatabaseSync) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -56,17 +52,4 @@ function migrate(db: Db) {
       value TEXT NOT NULL
     );
   `);
-}
-
-function seedAdmin(db: Db) {
-  const row = db.prepare("SELECT COUNT(*) as c FROM users").get() as unknown as { c: number };
-  if (row.c > 0) return;
-  const password = process.env.ADMIN_PASSWORD ?? "admin";
-  if (password === "admin") {
-    console.warn("[db] Seeding default admin user with password 'admin'. Change ADMIN_PASSWORD in production.");
-  }
-  const hash = bcrypt.hashSync(password, 12);
-  db.prepare(
-    "INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?,?,?,?,?)",
-  ).run(crypto.randomUUID(), "admin", hash, "admin", new Date().toISOString());
 }

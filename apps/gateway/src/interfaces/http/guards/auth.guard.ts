@@ -1,9 +1,10 @@
 import { FastifyRequest, FastifyReply } from "fastify";
-import { verifyToken, JwtPayload } from "./auth.js";
+import jwt from "jsonwebtoken";
+import { config } from "../../../config.js";
 
 declare module "fastify" {
   interface FastifyRequest {
-    user?: JwtPayload;
+    user?: { sub: string; username: string; role: "admin" | "viewer" };
   }
 }
 
@@ -13,7 +14,8 @@ export async function requireAuth(req: FastifyRequest, reply: FastifyReply) {
     return reply.code(401).send({ error: { code: "UNAUTHORIZED", message: "Missing token" } });
   }
   try {
-    req.user = verifyToken(header.slice(7));
+    const payload = jwt.verify(header.slice(7), config.jwtSecret) as any;
+    req.user = { sub: payload.sub, username: payload.username, role: payload.role };
   } catch {
     return reply.code(401).send({ error: { code: "UNAUTHORIZED", message: "Invalid token" } });
   }

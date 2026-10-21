@@ -1,8 +1,7 @@
 import { spawn, ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { config } from "../config.js";
-// No direct repository dependency (Clean Architecture: media layer receives URL)
+import { config } from "../../config.js";
 
 export interface StreamHealth {
   status: "starting" | "running" | "stopped" | "error";
@@ -17,6 +16,7 @@ export class FfmpegStream {
   private restarts = 0;
   private stopping = false;
   private restartTimer: NodeJS.Timeout | null = null;
+  private currentUrl: string | null = null;
   health: StreamHealth = { status: "stopped", restarts: 0 };
 
   constructor(
@@ -27,8 +27,6 @@ export class FfmpegStream {
   get hlsPath() {
     return path.join(this.outputDir, "index.m3u8");
   }
-
-  private currentUrl: string | null = null;
 
   start(rtspUrl?: string) {
     if (this.proc) return;
@@ -41,7 +39,6 @@ export class FfmpegStream {
     }
 
     fs.mkdirSync(this.outputDir, { recursive: true });
-    // clean old segments
     for (const f of fs.readdirSync(this.outputDir)) {
       if (f.endsWith(".ts") || f.endsWith(".m3u8")) fs.rmSync(path.join(this.outputDir, f), { force: true });
     }
