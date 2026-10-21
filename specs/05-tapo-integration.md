@@ -38,10 +38,19 @@ Mapeo de velocidad: 1-8 (Tapo). Exponer en API como `speed: 1..8`.
 
 ## 6. Modelos compatibles (referencia)
 
+Modelos del usuario (a validar en probe):
+- Tapo C510W V1 (exterior, PTZ probable).
+- Tapo TC42 V2 (interior, PTZ probable).
+- Tapo C520WS V2 (exterior, PTZ).
+- Tapo C200 (interior, PTZ).
+
+Otros:
 - Tapo C100/C110/C200 (interior, PTZ en C200).
 - Tapo C310/C320WS (exterior).
 - Tapo C500/C520WS (PTZ exterior).
 - Tapo TC60/TC70.
+
+Nota: capacidades (PTZ, audio, codec) se detectan dinámicamente en el probe; no asumir.
 
 Nota: capacidades varían; el gateway debe detectar PTZ y audio dinámicamente.
 
