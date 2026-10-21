@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+*.db
+*.db-journal
+apps/web/dist
+apps/gateway/dist
+packages/shared/dist
+.DS_Store
+Thumbs.db
+.vscode/.history
+coverage
+mediamtx

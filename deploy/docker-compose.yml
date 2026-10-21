@@ -1,0 +1,20 @@
+services:
+  gateway:
+    build: ../apps/gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../data:/data
+    env_file:
+      - ../.env
+    restart: unless-stopped
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    ports:
+      - "8554:8554"
+      - "8888:8888"
+      - "8889:8889"
+      - "8189:8189/udp"
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
+    restart: unless-stopped
