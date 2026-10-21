@@ -10,15 +10,24 @@ Visualización en vivo de cámaras TP-Link Tapo en TVs Hisense (Vidaa) y TCL (An
 - `specs/` — especificaciones técnicas.
 - `skills/` — skills para agentes.
 
-## Inicio rápido (cuando el código esté implementado)
+## Inicio rápido (desarrollo)
 
 ```bash
 pnpm install
-cp .env.example .env   # editar MASTER_KEY, JWT_SECRET
+cp .env.example .env   # editar MASTER_KEY, JWT_SECRET, ADMIN_PASSWORD
 pnpm dev               # gateway + web
 ```
 
-Despliegue: ver `specs/10-deployment-ops.md`.
+## Despliegue en Ubuntu (Lenovo G480)
+
+```bash
+cd deploy
+bash ubuntu-setup.sh
+```
+
+Ver `deploy/TESTING.md` para la checklist de validación.
+
+Despliegue manual: ver `specs/10-deployment-ops.md`.
 
 ## Estado
 
