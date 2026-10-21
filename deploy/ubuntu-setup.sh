@@ -19,12 +19,7 @@ cd "$HOME/sistema-camaras-local"
 
 echo "==> Configurando .env"
 if [ ! -f .env ]; then
-  cp .env.example .env
-  JWT=$(openssl rand -hex 32)
-  MASTER=$(openssl rand -base64 32)
-  sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$JWT/" .env
-  sed -i "s/^MASTER_KEY=.*/MASTER_KEY=$MASTER/" .env
-  echo "ADMIN_PASSWORD=admin (cambiar en .env)" >> .env
+  bash ./generate-secrets.sh .env
   echo "==> .env creado. Edita ADMIN_PASSWORD si quieres."
 fi
 
