@@ -9,6 +9,9 @@ import {
   getCameraWithSecret,
 } from "../repositories/cameras.js";
 import { requireAuth, requireRole } from "../guards.js";
+import { streamManager } from "../media/stream-manager.js";
+import { config } from "../config.js";
+import { probeCamera } from "../media/probe.js";
 
 export async function cameraRoutes(app: FastifyInstance) {
   app.get("/api/cameras", { preHandler: requireAuth }, async () => ({ items: listCameras() }));
@@ -50,18 +53,34 @@ export async function cameraRoutes(app: FastifyInstance) {
     return reply.code(204).send();
   });
 
-  // Probe placeholder (connectivity check) - to be implemented with RTSP
   app.post("/api/cameras/:id/probe", { preHandler: requireRole("admin") }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const secret = getCameraWithSecret(id);
-    if (!secret) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
-    // TODO: real RTSP probe. For now report configured.
-    return { status: "configured", camera: secret.dto.name };
+    if (!getCamera(id)) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
+    const result = await probeCamera(id);
+    return result;
   });
 
   app.get("/api/cameras/:id/health", { preHandler: requireAuth }, async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!getCamera(id)) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
-    return { status: "unknown" };
+    return streamManager.health(id);
+  });
+
+  app.get("/api/cameras/:id/stream", { preHandler: requireAuth }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!getCamera(id)) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
+    await streamManager.ensureRunning(id);
+    const base = `${req.protocol}://${req.headers.host}`;
+    return {
+      hlsUrl: `${base}/streams/${id}/index.m3u8`,
+      health: streamManager.health(id),
+    };
+  });
+
+  app.post("/api/cameras/:id/stream/stop", { preHandler: requireRole("admin") }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!getCamera(id)) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
+    streamManager.stop(id);
+    return { status: "stopped" };
   });
 }

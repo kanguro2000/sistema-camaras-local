@@ -1,0 +1,42 @@
+# mediamtx configuration for sistema-camaras-local
+# Docs: https://github.com/bluenviron/mediamtx
+
+logLevel: info
+logDestinations: [stdout]
+
+api: yes
+apiAddress: :9997
+
+rtspAddress: :8554
+rtpAddress: :8000
+rtcpAddress: :8001
+
+hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 500ms
+hlsAllowOrigin: '*'
+
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+
+# Paths are created dynamically by the gateway or via API.
+# Default path settings:
+pathDefaults:
+  source: publisher
+  sourceOnDemand: yes
+  sourceOnDemandStartTimeout: 10s
+  sourceOnDemandCloseAfter: 30s
+  runOnReady: ''
+  runOnReadyRestart: yes
+
+paths:
+  # Example (gateway creates entries like this via API or config reload):
+  # cam-<id>:
+  #   source: rtsp://user:pass@ip:554/stream1
+  #   sourceOnDemand: yes
+  all:
+    # catch-all not recommended for production; keep for dev only
+    source: publisher
