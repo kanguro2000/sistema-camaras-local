@@ -31,11 +31,15 @@ if [ ! -d "$REPO_DIR" ]; then
   if [ -n "${REPO_URL:-}" ]; then
     git clone "$REPO_URL" "$REPO_DIR"
   else
-    echo "Repo no encontrado en $REPO_DIR."
-    echo "Clona manualmente o define REPO_URL, por ejemplo:"
-    echo "  REPO_URL=https://github.com/tu-usuario/sistema-camaras-local.git bash deploy/ubuntu-setup.sh"
-    echo "O ejecuta el script desde dentro del repo ya clonado."
-    exit 1
+    echo "No se encontro el codigo en: $REPO_DIR"
+    read -r -p "Deseas descargar el codigo de git? (s/n): " answer || answer="n"
+    if [[ "$answer" =~ ^[sS]$ ]]; then
+      read -r -p "URL del repositorio: " url
+      git clone "$url" "$REPO_DIR"
+    else
+      echo "Coloca el codigo en $REPO_DIR y vuelve a ejecutar el script."
+      exit 1
+    fi
   fi
 fi
 cd "$REPO_DIR"
