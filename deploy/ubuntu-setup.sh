@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="${REPO_DIR:-$(dirname "$SCRIPT_DIR")}"
+
 echo "==> Actualizando sistema"
 sudo apt update && sudo apt upgrade -y
 
@@ -22,11 +25,20 @@ echo "==> Habilitando Docker"
 sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER"
 
-echo "==> Clonando repo (si no existe)"
-if [ ! -d "$HOME/sistema-camaras-local" ]; then
-  git clone https://github.com/tu-usuario/sistema-camaras-local.git "$HOME/sistema-camaras-local"
+echo "==> Ubicando repo"
+REPO_DIR="${REPO_DIR:-$HOME/sistema-camaras-local}"
+if [ ! -d "$REPO_DIR" ]; then
+  if [ -n "${REPO_URL:-}" ]; then
+    git clone "$REPO_URL" "$REPO_DIR"
+  else
+    echo "Repo no encontrado en $REPO_DIR."
+    echo "Clona manualmente o define REPO_URL, por ejemplo:"
+    echo "  REPO_URL=https://github.com/tu-usuario/sistema-camaras-local.git bash deploy/ubuntu-setup.sh"
+    echo "O ejecuta el script desde dentro del repo ya clonado."
+    exit 1
+  fi
 fi
-cd "$HOME/sistema-camaras-local"
+cd "$REPO_DIR"
 
 echo "==> Configurando .env"
 if [ ! -f .env ]; then
