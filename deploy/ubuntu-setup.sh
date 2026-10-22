@@ -5,7 +5,12 @@ echo "==> Actualizando sistema"
 sudo apt update && sudo apt upgrade -y
 
 echo "==> Instalando dependencias"
-sudo apt install -y docker.io docker-compose-plugin ffmpeg git curl
+sudo apt install -y docker.io ffmpeg git curl
+# docker compose plugin (opcional, puede no estar disponible en repos antiguos)
+if ! sudo apt install -y docker-compose-plugin 2>/dev/null; then
+  echo "docker-compose-plugin no disponible, instalando docker-compose (v1)..."
+  sudo apt install -y docker-compose || true
+fi
 
 echo "==> Habilitando Docker"
 sudo systemctl enable --now docker
@@ -25,7 +30,15 @@ fi
 
 echo "==> Levantando servicios"
 cd deploy
-docker compose up -d --build
+if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  COMPOSE="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE="docker-compose"
+else
+  echo "No se encontro docker compose. Instala docker-compose-plugin o docker-compose."
+  exit 1
+fi
+$COMPOSE up -d --build
 
 echo "==> Verificando health"
 sleep 5
