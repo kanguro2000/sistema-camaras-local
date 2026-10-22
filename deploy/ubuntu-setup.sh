@@ -26,7 +26,6 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER"
 
 echo "==> Ubicando repo"
-REPO_DIR="${REPO_DIR:-$HOME/sistema-camaras-local}"
 if [ ! -d "$REPO_DIR" ]; then
   echo "No se encontro el codigo en: $REPO_DIR"
   echo "Clona el repositorio manualmente antes de ejecutar este script, por ejemplo:"
@@ -38,7 +37,7 @@ cd "$REPO_DIR"
 
 echo "==> Configurando .env"
 if [ ! -f .env ]; then
-  bash ./generate-secrets.sh .env
+  bash "$SCRIPT_DIR/generate-secrets.sh" "$REPO_DIR/.env"
   echo "==> .env creado. Edita ADMIN_PASSWORD si quieres."
 fi
 
