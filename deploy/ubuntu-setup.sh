@@ -28,19 +28,11 @@ sudo usermod -aG docker "$USER"
 echo "==> Ubicando repo"
 REPO_DIR="${REPO_DIR:-$HOME/sistema-camaras-local}"
 if [ ! -d "$REPO_DIR" ]; then
-  if [ -n "${REPO_URL:-}" ]; then
-    git clone "$REPO_URL" "$REPO_DIR"
-  else
-    echo "No se encontro el codigo en: $REPO_DIR"
-    read -r -p "Deseas descargar el codigo de git? (s/n): " answer || answer="n"
-    if [[ "$answer" =~ ^[sS]$ ]]; then
-      read -r -p "URL del repositorio: " url
-      git clone "$url" "$REPO_DIR"
-    else
-      echo "Coloca el codigo en $REPO_DIR y vuelve a ejecutar el script."
-      exit 1
-    fi
-  fi
+  echo "No se encontro el codigo en: $REPO_DIR"
+  echo "Clona el repositorio manualmente antes de ejecutar este script, por ejemplo:"
+  echo "  git clone <url-del-repo> $REPO_DIR"
+  echo "Luego ejecuta: bash $REPO_DIR/deploy/ubuntu-setup.sh"
+  exit 1
 fi
 cd "$REPO_DIR"
 
