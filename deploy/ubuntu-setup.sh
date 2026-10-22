@@ -6,10 +6,16 @@ sudo apt update && sudo apt upgrade -y
 
 echo "==> Instalando dependencias"
 sudo apt install -y docker.io ffmpeg git curl
-# docker compose plugin (opcional, puede no estar disponible en repos antiguos)
-if ! sudo apt install -y docker-compose-plugin 2>/dev/null; then
-  echo "docker-compose-plugin no disponible, instalando docker-compose (v1)..."
-  sudo apt install -y docker-compose || true
+# docker compose: probar varios nombres de paquete segun la distro
+COMPOSE_INSTALLED=false
+for pkg in docker-compose-plugin docker-compose-v2 docker-compose; do
+  if sudo apt install -y "$pkg" 2>/dev/null; then
+    COMPOSE_INSTALLED=true
+    break
+  fi
+done
+if [ "$COMPOSE_INSTALLED" = false ]; then
+  echo "No se pudo instalar docker compose via apt. Intenta instalar docker-ce desde el repo oficial."
 fi
 
 echo "==> Habilitando Docker"
