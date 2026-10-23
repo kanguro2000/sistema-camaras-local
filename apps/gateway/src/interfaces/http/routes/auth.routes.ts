@@ -1,9 +1,17 @@
 import { FastifyInstance } from "fastify";
 import { LoginSchema } from "@sistema-camaras/shared";
 import { AuthService } from "../../../application/services/auth.service.js";
+import { requireAuth } from "../guards/auth.guard.js";
 
 export function authRoutesFactory(auth: AuthService) {
   return async function authRoutes(app: FastifyInstance) {
+    app.get("/api/auth/me", { preHandler: requireAuth(auth) }, async (req, reply) => {
+      if (!req.user) {
+        return reply.code(401).send({ error: { code: "UNAUTHORIZED", message: "Missing user identity" } });
+      }
+      return { id: req.user.sub, username: req.user.username, role: req.user.role };
+    });
+
     app.post(
       "/api/auth/login",
       { config: { rateLimit: { max: 5, timeWindow: 60_000 } } },

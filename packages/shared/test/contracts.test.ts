@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CameraCreateSchema, CameraSchema, LoginSchema } from "../src/index.js";
+import {
+  CameraCreateSchema,
+  CameraProbeResultSchema,
+  CameraSchema,
+  LoginSchema,
+} from "../src/index.js";
 
 test("camera contracts accept IPv4 and IPv6 without exposing credential fields", () => {
   const input = {
@@ -30,4 +35,13 @@ test("camera contracts accept IPv4 and IPv6 without exposing credential fields",
 test("login contract rejects empty credentials", () => {
   assert.equal(LoginSchema.safeParse({ username: "", password: "x" }).success, false);
   assert.equal(LoginSchema.safeParse({ username: "admin", password: "secret" }).success, true);
+});
+
+test("camera probe contract validates success and failure results", () => {
+  assert.equal(
+    CameraProbeResultSchema.safeParse({ ok: true, codecVideo: "h264", width: 1920, height: 1080 }).success,
+    true,
+  );
+  assert.equal(CameraProbeResultSchema.safeParse({ ok: false, error: "Connection timed out" }).success, true);
+  assert.equal(CameraProbeResultSchema.safeParse({ ok: "yes" }).success, false);
 });

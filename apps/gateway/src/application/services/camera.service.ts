@@ -1,6 +1,6 @@
 import { Camera, CameraCreateInput, CameraUpdateInput } from "../../domain/entities/camera.js";
 import { CameraRepository } from "../../domain/repositories/camera.repository.js";
-import { CameraProbe } from "../../domain/services/camera-probe.js";
+import { CameraProbe, CameraProbeResult } from "../../domain/services/camera-probe.js";
 
 export class CameraService {
   constructor(
@@ -28,7 +28,7 @@ export class CameraService {
     return this.cameras.delete(id);
   }
 
-  probe(id: string) {
+  probe(id: string): Promise<CameraProbeResult> {
     const secret = this.cameras.getWithSecret(id);
     if (!secret) return Promise.resolve({ ok: false, error: "Camera not found" });
     const streamPath = secret.camera.channel === "sd" ? "/stream2" : "/stream1";

@@ -18,11 +18,24 @@ import { JwtAccessTokenService } from "./infrastructure/security/jwt-access-toke
 import { authRoutesFactory } from "./interfaces/http/routes/auth.routes.js";
 import { cameraRoutesFactory } from "./interfaces/http/routes/camera.routes.js";
 import { streamRoutesFactory } from "./interfaces/http/routes/stream.routes.js";
-import { streamManager } from "./infrastructure/media/stream-manager.js";
+import { StreamManager } from "./infrastructure/media/stream-manager.js";
 import { JwtStreamTicketService } from "./infrastructure/security/jwt-stream-ticket.service.js";
 
 export async function buildApp() {
-  const app = Fastify({ logger: { level: config.logLevel } });
+  const app = Fastify({
+    logger: {
+      level: config.logLevel,
+      serializers: {
+        req: (request) => ({
+          method: request.method,
+          url: request.url.split("?")[0],
+        }),
+      },
+    },
+  });
+  const streamManager = new StreamManager(undefined, (failure) => {
+    app.log.error({ event: "camera_stream_failed", ...failure }, "Camera stream failed");
+  });
 
   getDatabase();
   fs.mkdirSync(path.resolve("./data/streams"), { recursive: true });
