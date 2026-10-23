@@ -1,10 +1,12 @@
+import { Camera, CameraCreateInput, CameraUpdateInput } from "../../domain/entities/camera.js";
 import { CameraRepository } from "../../domain/repositories/camera.repository.js";
-import { Camera } from "../../domain/entities/camera.js";
-import { CameraCreate, CameraUpdate } from "@sistema-camaras/shared";
-import { probeRtsp } from "../../infrastructure/media/probe.js";
+import { CameraProbe } from "../../domain/services/camera-probe.js";
 
 export class CameraService {
-  constructor(private cameras: CameraRepository) {}
+  constructor(
+    private readonly cameras: CameraRepository,
+    private readonly cameraProbe: CameraProbe,
+  ) {}
 
   list(): Camera[] {
     return this.cameras.list();
@@ -14,11 +16,11 @@ export class CameraService {
     return this.cameras.getById(id);
   }
 
-  create(input: CameraCreate): Camera {
+  create(input: CameraCreateInput): Camera {
     return this.cameras.create(input);
   }
 
-  update(id: string, input: CameraUpdate): Camera | null {
+  update(id: string, input: CameraUpdateInput): Camera | null {
     return this.cameras.update(id, input);
   }
 
@@ -26,15 +28,11 @@ export class CameraService {
     return this.cameras.delete(id);
   }
 
-  getWithSecret(id: string) {
-    return this.cameras.getWithSecret(id);
-  }
-
   probe(id: string) {
     const secret = this.cameras.getWithSecret(id);
     if (!secret) return Promise.resolve({ ok: false, error: "Camera not found" });
     const streamPath = secret.camera.channel === "sd" ? "/stream2" : "/stream1";
     const url = `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.camera.ip}:554${streamPath}`;
-    return probeRtsp(url);
+    return this.cameraProbe.probe(url);
   }
 }

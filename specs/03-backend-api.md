@@ -28,15 +28,17 @@
 - `PATCH /api/cameras/:id`
 - `DELETE /api/cameras/:id`
 - `POST /api/cameras/:id/probe` → valida conectividad
+- `GET /api/cameras/:id/stream` → emite cookie de acceso temporal y devuelve URL HLS relativa
 - `GET /api/cameras/:id/snapshot` → image/jpeg
 - `POST /api/cameras/:id/ptz` { action: 'up'|'down'|'left'|'right'|'zoomin'|'zoomout'|'home'|'preset', speed?, presetId? }
 - `GET /api/cameras/:id/presets`
 - `POST /api/cameras/:id/presets` { name, position }
 - `GET /api/cameras/:id/health` → { status, fps, bitrate, lastFrameAt }
 
-### Streams (servidos por mediamtx, proxied)
-- `GET /streams/:cameraId/index.m3u8`
-- `GET /streams/:cameraId/*` (segmentos)
+### Streams (servidos por el gateway)
+- `GET /streams/:cameraId/index.m3u8` → requiere cookie `camera_stream` temporal, `HttpOnly`, `SameSite=Strict` y limitada a la ruta de esa cámara
+- `GET /streams/:cameraId/:segment.ts` → requiere la misma cookie; respuestas `private, no-store`
+- `POST /streams/:cameraId/ticket` → renueva el ticket mientras el ticket vigente sea válido
 - `POST /streams/:cameraId/whep` (WebRTC, opcional)
 
 ### Settings
@@ -51,8 +53,8 @@ export const CameraSchema = z.object({
   name: z.string().min(1).max(64),
   ip: z.string().ip(),
   model: z.string().optional(),
-  username: z.string(),
-  // password nunca se retorna
+  hasCredentials: z.boolean(),
+  // username y password nunca se retornan
   channel: z.enum(['hd', 'sd']).default('hd'),
   rtspPath: z.string().default('/stream1'),
   enabled: z.boolean().default(true),

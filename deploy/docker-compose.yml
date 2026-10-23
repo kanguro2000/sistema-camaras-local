@@ -1,20 +1,38 @@
 services:
   gateway:
-    build: ../apps/gateway
-    ports:
-      - "8080:8080"
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: gateway
+    expose:
+      - "8080"
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
-      - ../data:/data
+      - ../data:/workspace/apps/gateway/data
     env_file:
       - ../.env
     restart: unless-stopped
-  mediamtx:
-    image: bluenviron/mediamtx:latest
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web
+    depends_on:
+      - gateway
     ports:
-      - "8554:8554"
-      - "8888:8888"
-      - "8889:8889"
-      - "8189:8189/udp"
-    volumes:
-      - ./mediamtx.yml:/mediamtx.yml
+      - "8080:8080"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp

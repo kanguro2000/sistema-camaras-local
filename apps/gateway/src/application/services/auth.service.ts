@@ -1,7 +1,6 @@
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { UserRepository } from "../../domain/repositories/user.repository.js";
-import { config } from "../../config.js";
+import { AccessTokenService, AuthenticatedUser } from "../../domain/services/access-token-service.js";
+import { PasswordHasher } from "../../domain/services/password-hasher.js";
 
 export interface AuthResult {
   accessToken: string;
@@ -9,17 +8,28 @@ export interface AuthResult {
 }
 
 export class AuthService {
-  constructor(private users: UserRepository) {}
+  constructor(
+    private readonly users: UserRepository,
+    private readonly passwords: PasswordHasher,
+    private readonly accessTokens: AccessTokenService,
+  ) {}
 
-  login(username: string, password: string): AuthResult | null {
-    const u = this.users.findByUsername(username);
-    if (!u) return null;
-    if (!bcrypt.compareSync(password, u.passwordHash)) return null;
-    const token = jwt.sign(
-      { sub: u.id, username: u.username, role: u.role },
-      config.jwtSecret,
-      { expiresIn: "15m" },
-    );
-    return { accessToken: token, user: { id: u.id, username: u.username, role: u.role } };
+  async login(username: string, password: string): Promise<AuthResult | null> {
+    const user = this.users.findByUsername(username);
+    if (!user || !(await this.passwords.verify(password, user.passwordHash))) return null;
+
+    const identity: AuthenticatedUser = {
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+    };
+    return {
+      accessToken: this.accessTokens.issue(identity),
+      user: { id: user.id, username: user.username, role: user.role },
+    };
+  }
+
+  authenticate(token: string): AuthenticatedUser | null {
+    return this.accessTokens.verify(token);
   }
 }

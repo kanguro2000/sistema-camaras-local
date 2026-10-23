@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { getDatabase } from "../db/sqlite.database.js";
 import { User } from "../../domain/entities/user.js";
 import { UserRepository } from "../../domain/repositories/user.repository.js";
+import { config } from "../../config.js";
 
 export class SqliteUserRepository implements UserRepository {
   private db: DatabaseSync;
@@ -15,9 +16,9 @@ export class SqliteUserRepository implements UserRepository {
   private seedAdmin() {
     const row = this.db.prepare("SELECT COUNT(*) as c FROM users").get() as unknown as { c: number };
     if (row.c > 0) return;
-    const password = process.env.ADMIN_PASSWORD ?? "admin";
-    if (password === "admin") {
-      console.warn("[db] Seeding default admin user with password 'admin'. Change ADMIN_PASSWORD in production.");
+    const password = config.adminPassword;
+    if (!password || password.length < 12) {
+      throw new Error("ADMIN_PASSWORD must contain at least 12 characters when initializing the admin user");
     }
     const hash = bcrypt.hashSync(password, 12);
     const id = crypto.randomUUID();

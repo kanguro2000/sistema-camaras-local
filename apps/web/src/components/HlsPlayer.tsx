@@ -16,6 +16,9 @@ export default function HlsPlayer({ src, className }: Props) {
 
     if (Hls.isSupported()) {
       hls = new Hls({
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = true;
+        },
         lowLatencyMode: true,
         liveSyncDuration: 1,
         liveMaxLatencyDuration: 3,

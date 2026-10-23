@@ -1,11 +1,10 @@
-import { Camera } from "../entities/camera.js";
-import { CameraCreate, CameraUpdate } from "@sistema-camaras/shared";
+import { Camera, CameraCreateInput, CameraUpdateInput } from "../entities/camera.js";
 
 export interface CameraRepository {
   list(): Camera[];
   getById(id: string): Camera | null;
   getWithSecret(id: string): { camera: Camera; username: string; password: string } | null;
-  create(input: CameraCreate): Camera;
-  update(id: string, input: CameraUpdate): Camera | null;
+  create(input: CameraCreateInput): Camera;
+  update(id: string, input: CameraUpdateInput): Camera | null;
   delete(id: string): boolean;
 }

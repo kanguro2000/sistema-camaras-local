@@ -7,9 +7,12 @@ let dbInstance: DatabaseSync | null = null;
 
 export function getDatabase(): DatabaseSync {
   if (dbInstance) return dbInstance;
-  const dir = path.dirname(path.resolve(config.dbPath));
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const db = new DatabaseSync(path.resolve(config.dbPath));
+  const dbPath = config.dbPath === ":memory:" ? config.dbPath : path.resolve(config.dbPath);
+  if (dbPath !== ":memory:") {
+    const dir = path.dirname(dbPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  }
+  const db = new DatabaseSync(dbPath);
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA foreign_keys = ON;");
   migrate(db);
