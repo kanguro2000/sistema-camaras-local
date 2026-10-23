@@ -45,6 +45,7 @@ export function streamRoutesFactory(streams: CameraStreamService, tickets: Strea
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
       if (!fs.existsSync(playlistPath)) {
+        req.log.warn({ event: "camera_playlist_not_ready", cameraId }, "HLS playlist was not ready in time");
         return reply.code(503).send({ error: { code: "STREAM_ERROR", message: "Stream not ready" } });
       }
 

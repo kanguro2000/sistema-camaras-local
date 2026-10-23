@@ -34,6 +34,16 @@ export const CameraUpdateSchema = CameraCreateSchema.partial().omit({ password: 
 });
 export type CameraUpdate = z.infer<typeof CameraUpdateSchema>;
 
+export const CameraProbeResultSchema = z.object({
+  ok: z.boolean(),
+  codecVideo: z.string().optional(),
+  codecAudio: z.string().optional(),
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  error: z.string().optional(),
+});
+export type CameraProbeResult = z.infer<typeof CameraProbeResultSchema>;
+
 export const UserRoleSchema = z.enum(["admin", "viewer"]);
 export type UserRole = z.infer<typeof UserRoleSchema>;
 

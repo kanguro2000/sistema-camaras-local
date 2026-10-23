@@ -8,6 +8,7 @@ export interface AppState {
   user: User | null;
   cameras: Camera[];
   setAuth: (token: string, user: User) => void;
+  setUser: (user: User) => void;
   logout: () => void;
   setCameras: (c: Camera[]) => void;
 }
@@ -21,6 +22,7 @@ export function createAppStore(tokenStorage: TokenStorage) {
       tokenStorage.set(token);
       set({ token, user });
     },
+    setUser: (user) => set({ user }),
     logout: () => {
       tokenStorage.set(null);
       set({ token: null, user: null, cameras: [] });

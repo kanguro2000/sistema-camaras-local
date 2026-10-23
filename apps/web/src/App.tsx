@@ -3,11 +3,12 @@ import { AppService } from "./application/services/app-service.js";
 import { AppStore } from "./store.js";
 import HlsPlayer from "./components/HlsPlayer.js";
 import CameraTile from "./components/CameraTile.js";
+import CameraManagement from "./components/CameraManagement.js";
 
-type View = "login" | "grid" | "fullscreen";
+type View = "login" | "grid" | "fullscreen" | "manage";
 
 export default function App({ service, store }: { service: AppService; store: AppStore }) {
-  const { token, user, setAuth, logout, cameras, setCameras } = store();
+  const { token, user, setAuth, setUser, logout, cameras, setCameras } = store();
   const [view, setView] = useState<View>(token ? "grid" : "login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -15,6 +16,10 @@ export default function App({ service, store }: { service: AppService; store: Ap
   const [selected, setSelected] = useState(0);
   const [fullId, setFullId] = useState<string | null>(null);
   const [fullSrc, setFullSrc] = useState<string | null>(null);
+
+  const refreshCameras = useCallback(async () => {
+    setCameras(await service.listCameras());
+  }, [service, setCameras]);
 
   const openCamera = useCallback(async (cameraId: string) => {
     setError(null);
@@ -28,25 +33,51 @@ export default function App({ service, store }: { service: AppService; store: Ap
     }
   }, [service]);
 
-  // Load cameras when authenticated
+  useEffect(() => {
+    if (!token || user) return;
+    let active = true;
+    service.currentUser()
+      .then((currentUser) => {
+        if (active) setUser(currentUser);
+      })
+      .catch(() => {
+        if (!active) return;
+        logout();
+        setView("login");
+        setError("La sesión expiró. Inicia sesión de nuevo.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [logout, service, setUser, token, user]);
+
   useEffect(() => {
     if (!token) return;
-    service.listCameras()
-      .then(setCameras)
+    refreshCameras()
       .catch((e) => setError(String(e)));
-  }, [service, token, setCameras]);
+  }, [refreshCameras, token]);
 
-  // D-pad navigation for grid
   useEffect(() => {
     if (view !== "grid") return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") setSelected((s) => Math.min(s + 1, cameras.length - 1));
-      else if (e.key === "ArrowLeft") setSelected((s) => Math.max(s - 1, 0));
-      else if (e.key === "ArrowDown") setSelected((s) => Math.min(s + 2, cameras.length - 1));
-      else if (e.key === "ArrowUp") setSelected((s) => Math.max(s - 2, 0));
-      else if (e.key === "Enter") {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key.startsWith("Arrow")) {
+        const controls = Array.from(document.querySelectorAll<HTMLButtonElement>(".grid-view button"));
+        if (controls.length === 0) return;
+        const currentIndex = controls.findIndex((control) => control === document.activeElement);
+        const direction = event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 1;
+        const nextIndex = currentIndex < 0
+          ? (direction > 0 ? 0 : controls.length - 1)
+          : (currentIndex + direction + controls.length) % controls.length;
+        event.preventDefault();
+        const nextControl = controls[nextIndex];
+        nextControl?.focus();
+        const cameraIndex = Number(nextControl?.dataset.cameraIndex);
+        if (Number.isInteger(cameraIndex) && cameraIndex >= 0) setSelected(cameraIndex);
+      } else if (event.key === "Enter") {
+        const activeControl = document.activeElement?.closest(".grid-view button");
+        if (activeControl) return;
         if (cameras[selected]) void openCamera(cameras[selected].id);
-      } else if (e.key === "Escape" || e.key === "Backspace") {
+      } else if (event.key === "Escape" || event.key === "Backspace") {
         logout();
         setView("login");
       }
@@ -55,7 +86,6 @@ export default function App({ service, store }: { service: AppService; store: Ap
     return () => window.removeEventListener("keydown", handler);
   }, [view, cameras, selected, openCamera, logout]);
 
-  // Fullscreen back
   useEffect(() => {
     if (view !== "fullscreen") return;
     const handler = (e: KeyboardEvent) => {
@@ -95,6 +125,10 @@ export default function App({ service, store }: { service: AppService; store: Ap
     }
   };
 
+  if (token && !user) {
+    return <div className="login" role="status">Restaurando sesión…</div>;
+  }
+
   if (view === "login") {
     return (
       <div className="login">
@@ -122,15 +156,33 @@ export default function App({ service, store }: { service: AppService; store: Ap
     );
   }
 
+  if (view === "manage") {
+    return (
+      <CameraManagement
+        cameras={cameras}
+        service={service}
+        onCamerasChanged={refreshCameras}
+        onBack={() => setView("grid")}
+      />
+    );
+  }
+
   return (
     <div className="grid-view">
-      <header>
+      <header className="grid-header">
         <h1>Cámaras ({user?.username})</h1>
+        <nav aria-label="Acciones de usuario">
+          {user?.role === "admin" && (
+            <button type="button" onClick={() => setView("manage")}>Administrar cámaras</button>
+          )}
+          <button type="button" onClick={() => { logout(); setView("login"); }}>Cerrar sesión</button>
+        </nav>
       </header>
       <div className="grid">
         {cameras.map((c, i) => (
           <CameraTile
             key={c.id}
+            index={i}
             name={c.name}
             selected={i === selected}
             onSelect={() => {
@@ -139,7 +191,16 @@ export default function App({ service, store }: { service: AppService; store: Ap
             }}
           />
         ))}
-        {cameras.length === 0 && <p>No hay cámaras. Agrégalas desde el gateway.</p>}
+        {cameras.length === 0 && (
+          <div className="empty-cameras">
+            <p>No hay cámaras registradas.</p>
+            {user?.role === "admin" ? (
+              <button type="button" onClick={() => setView("manage")}>Agregar la primera cámara</button>
+            ) : (
+              <p>Pide a una persona administradora que registre las cámaras.</p>
+            )}
+          </div>
+        )}
       </div>
       {error && <p className="error">{error}</p>}
       <footer className="hint">Flechas: navegar · Enter: abrir · Esc: salir</footer>

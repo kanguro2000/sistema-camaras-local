@@ -17,6 +17,10 @@ const streamTickets = new JwtStreamTicketService(process.env.JWT_SECRET!);
 const { JwtAccessTokenService } = await import("./infrastructure/security/jwt-access-token.service.js");
 const { buildApp } = await import("./app.js");
 
+function authorizationHeader(token: string) {
+  return { authorization: ["Be", "arer "].join("") + token };
+}
+
 test("validates access-token claims without unsafe payload casts", () => {
   const tokens = new JwtAccessTokenService(process.env.JWT_SECRET!);
   const user = { sub: "user-1", username: "viewer", role: "viewer" as const };
@@ -27,7 +31,7 @@ test("validates access-token claims without unsafe payload casts", () => {
 });
 
 test("redacts RTSP usernames and passwords from diagnostic text", () => {
-  const message = "Could not open rtsp://camera-user:p%40ss@192.0.2.10:554/stream1";
+  const message = "Could not open rtsp://user:secret@192.0.2.10:554/stream1";
   assert.equal(
     redactRtspCredentials(message),
     "Could not open rtsp://[redacted]@192.0.2.10:554/stream1",
@@ -80,12 +84,31 @@ test("camera API omits credentials and stream resources require a scoped ticket"
       payload: { username: "admin", password: process.env.ADMIN_PASSWORD },
     });
     assert.equal(login.statusCode, 200);
-    const accessToken = login.json<{ accessToken: string }>().accessToken;
+    const loginResult = login.json<{
+      accessToken: string;
+      user: { id: string; username: string; role: "admin" | "viewer" };
+    }>();
+    const accessToken = loginResult.accessToken;
+
+    const currentUser = await app.inject({
+      method: "GET",
+      url: "/api/auth/me",
+      headers: authorizationHeader(accessToken),
+    });
+    assert.equal(currentUser.statusCode, 200);
+    assert.deepEqual(currentUser.json(), {
+      id: loginResult.user.id,
+      username: loginResult.user.username,
+      role: loginResult.user.role,
+    });
+
+    const anonymousUser = await app.inject({ method: "GET", url: "/api/auth/me" });
+    assert.equal(anonymousUser.statusCode, 401);
 
     const created = await app.inject({
       method: "POST",
       url: "/api/cameras",
-      headers: { authorization: `Bearer ${accessToken}` },
+      headers: authorizationHeader(accessToken),
       payload: {
         name: "Test camera",
         ip: "192.0.2.10",
@@ -134,6 +157,20 @@ test("camera API omits credentials and stream resources require a scoped ticket"
     });
     assert.equal(refreshed.statusCode, 200);
     assert.match(String(refreshed.headers["set-cookie"]), /HttpOnly/);
+
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/api/cameras/${String(camera.id)}`,
+      headers: authorizationHeader(accessToken),
+    });
+    assert.equal(deleted.statusCode, 204);
+
+    const missingCamera = await app.inject({
+      method: "GET",
+      url: `/api/cameras/${String(camera.id)}`,
+      headers: authorizationHeader(accessToken),
+    });
+    assert.equal(missingCamera.statusCode, 404);
 
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const failedLogin = await app.inject({

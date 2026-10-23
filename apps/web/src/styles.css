@@ -67,6 +67,185 @@ header { margin-bottom: 16px; }
   border-color: #4f8cff;
   box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.4);
 }
+.grid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.grid-header nav,
+.camera-actions,
+.form-actions,
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.grid-header button,
+.camera-management button {
+  border: 1px solid #455264;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #1c2735;
+  color: #e6e9ef;
+  font: inherit;
+  cursor: pointer;
+}
+.grid-header button:hover,
+.camera-management button:hover,
+.camera-management button[aria-pressed="true"] {
+  background: #263a54;
+}
+.grid-header button:focus-visible,
+.camera-management button:focus-visible,
+.camera-management input:focus-visible {
+  outline: 3px solid #4f8cff;
+  outline-offset: 2px;
+}
+.grid-header button:disabled,
+.camera-management button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.empty-cameras {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 24px;
+  background: #151a22;
+  border-radius: 12px;
+}
+.camera-management {
+  height: 100vh;
+  overflow-y: auto;
+  padding: 24px;
+}
+.management-header,
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.management-header {
+  margin-bottom: 24px;
+}
+.management-header p,
+.camera-form-section > p,
+.camera-card p,
+.delete-confirmation p {
+  color: #bdc6d2;
+}
+.camera-management h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.camera-list {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 24px;
+  padding: 0;
+  list-style: none;
+}
+.camera-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 18px;
+  background: #151a22;
+  border-radius: 12px;
+}
+.camera-card h3,
+.camera-card p {
+  margin: 4px 0;
+}
+.camera-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.camera-management .danger-button {
+  border-color: #9e4141;
+  background: #542525;
+}
+.camera-form-section,
+.delete-confirmation {
+  max-width: 760px;
+  margin-top: 24px;
+  padding: 20px;
+  background: #151a22;
+  border-radius: 12px;
+}
+.camera-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.camera-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.camera-form input:not([type="checkbox"]) {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #455264;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #0b0f14;
+  color: #e6e9ef;
+  font: inherit;
+}
+.channel-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #455264;
+  border-radius: 8px;
+}
+.channel-options legend {
+  padding: 0 6px;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.checkbox-label input {
+  width: 20px;
+  height: 20px;
+}
+.camera-form .form-actions {
+  grid-column: 1 / -1;
+}
+.camera-management .notice {
+  color: #8de0a7;
+}
+.camera-management .error {
+  margin: 12px 0;
+}
+@media (max-width: 760px) {
+  .grid-header,
+  .management-header,
+  .section-heading,
+  .camera-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .camera-form {
+    grid-template-columns: 1fr;
+  }
+  .camera-form .form-actions {
+    grid-column: auto;
+  }
+  .camera-actions,
+  .grid-header nav {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
 .tile-name { font-weight: 600; }
 .tile-status { position: absolute; top: 8px; right: 12px; color: #4caf50; }
 .tile { position: relative; }

@@ -11,6 +11,12 @@ export interface StreamHealth {
   startedAt?: string;
 }
 
+export interface StreamFailure {
+  cameraId: string;
+  error: string;
+  restarts: number;
+}
+
 export class FfmpegStream {
   private proc: ChildProcess | null = null;
   private restarts = 0;
@@ -22,6 +28,7 @@ export class FfmpegStream {
   constructor(
     public readonly cameraId: string,
     private readonly outputDir: string,
+    private readonly onFailure?: (failure: StreamFailure) => void,
   ) {}
 
   get hlsPath() {
@@ -34,7 +41,7 @@ export class FfmpegStream {
     if (rtspUrl) this.currentUrl = rtspUrl;
     const url = this.currentUrl;
     if (!url) {
-      this.health = { ...this.health, status: "error", lastError: "Missing RTSP URL" };
+      this.reportFailure("Missing RTSP URL");
       return;
     }
 
@@ -61,15 +68,14 @@ export class FfmpegStream {
     try {
       this.proc = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "pipe"] });
     } catch (e) {
-      this.health = { status: "error", restarts: this.restarts, lastError: String(e) };
+      this.reportFailure(`Failed to start ffmpeg: ${String(e)}`);
       this.scheduleRestart();
       return;
     }
     this.health.pid = this.proc.pid;
     this.proc.on("error", (err) => {
       this.proc = null;
-      this.health.status = "error";
-      this.health.lastError = redactRtspCredentials(`Failed to spawn ffmpeg: ${err.message}`);
+      this.reportFailure(`Failed to spawn ffmpeg: ${err.message}`);
       this.scheduleRestart();
     });
     this.proc.stdout?.on("data", () => {
@@ -85,10 +91,20 @@ export class FfmpegStream {
         this.health.status = "stopped";
         return;
       }
-      this.health.status = "error";
-      this.health.lastError = `ffmpeg exited with code ${code}`;
+      this.reportFailure(this.health.lastError ?? `ffmpeg exited with code ${code}`);
       this.scheduleRestart();
     });
+  }
+
+  private reportFailure(message: string) {
+    const error = redactRtspCredentials(message).slice(-500);
+    this.health = {
+      ...this.health,
+      status: "error",
+      restarts: this.restarts,
+      lastError: error,
+    };
+    this.onFailure?.({ cameraId: this.cameraId, error, restarts: this.restarts });
   }
 
   private scheduleRestart() {

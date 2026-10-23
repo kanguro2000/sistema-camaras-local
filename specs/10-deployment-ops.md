@@ -47,7 +47,9 @@ Solo el frontend/proxy publica el puerto `8080` en la LAN. El gateway queda en l
 ## 5. Monitoreo
 
 - Health endpoint `/api/health`.
-- Logs estructurados (pino) con rotación.
+- Logs estructurados (pino) con rotación Docker (10 MB, 3 archivos por servicio).
+- Los fallos de probe RTSP, FFmpeg y generación de playlist se registran sin credenciales.
+- `bash deploy/collect-diagnostics.sh [duración]` crea un informe local sanitizado con estado de servicios, health y logs recientes; no adjunta `.env` ni la base de datos.
 - (Opcional) Prometheus metrics.
 
 ## 6. Actualizaciones

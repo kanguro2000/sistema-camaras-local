@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src test",
-    "test": "tsx --test test/store.test.ts"
+    "test": "tsx --test test/store.test.ts test/http-app-gateway.test.ts"
   },
   "dependencies": {
     "@sistema-camaras/shared": "workspace:*",

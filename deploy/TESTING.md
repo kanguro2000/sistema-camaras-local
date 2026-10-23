@@ -6,14 +6,15 @@
 - [ ] `bash deploy/ubuntu-setup.sh` termina correctamente y muestra health `ok`.
 - [ ] `curl --fail http://localhost:8080/api/health` responde ok.
 - [ ] Interfaz web disponible en `http://localhost:8080`.
+- [ ] Desde otro equipo de la LAN, abrir `http://<IP-LAN-DE-UBUNTU>:8080`; las TVs usan esa misma URL.
 - [ ] Solo el puerto 8080 está publicado por Compose; no reenviarlo desde el router a Internet.
 
 ## 2. Cámaras (Camera Account creado en app Tapo)
 Modelos a probar: C510W V1, TC42 V2, C520WS V2, C200.
 
 Para cada cámara:
-- [ ] Agregar vía API/UI (nombre, IP, usuario, contraseña, canal HD).
-- [ ] `POST /api/cameras/:id/probe` → codecVideo/codecAudio reportados.
+- [ ] En la app, abrir **Administrar cámaras** → **Agregar cámara** (nombre, IP, modelo, cuenta de cámara Tapo y canal HD/SD).
+- [ ] **Probar conexión** → codecVideo/codecAudio reportados.
 - [ ] `GET /api/cameras/:id/stream` → hlsUrl.
 - [ ] Reproducir HLS desde la interfaz (los recursos requieren la cookie HttpOnly; no abrir la URL sin autenticar).
 - [ ] Latencia medida < 2 s.
@@ -35,3 +36,4 @@ Para cada cámara:
 - Sin audio → codec G.711, transcode a AAC (ya configurado).
 - Stream no arranca → revisar `docker compose logs gateway`; FFmpeg se instala en la imagen.
 - Alta CPU → usar canal SD o reducir cámaras simultáneas.
+- Para compartir errores del gateway/reproductor, ejecutar `bash deploy/collect-diagnostics.sh` desde el repositorio en Ubuntu y revisar el informe antes de enviarlo. No compartir `.env` ni la base de datos.

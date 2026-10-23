@@ -4,7 +4,8 @@
 
 - **Home / Grid**: grid de cámaras (1, 2x2, 3x3, 4x4). Cada tile muestra video + nombre + estado.
 - **Fullscreen**: una cámara a pantalla completa con overlay de controles.
-- **Settings**: cámaras, usuarios, calidad, gateway.
+- **Administrar cámaras** (admin): agregar, editar, eliminar y probar conexión RTSP de cámaras.
+- El acceso a administración aparece en la vista principal al iniciar sesión como admin; no existe una vista separada del gateway.
 - **PTZ Panel**: controles direccionales (solo modelos PTZ).
 
 ## 2. Navegación por control remoto
@@ -12,6 +13,7 @@
 - Flechas: mover foco.
 - OK/Enter: seleccionar/abrir.
 - Back/Escape: volver.
+- En la vista principal, los controles de administración y las cámaras se pueden recorrer con el D-pad; Enter/OK activa el control enfocado.
 - Teclas de color (si existen): atajos (rojo = grid, verde = fullscreen, etc.) opcional.
 - Foco visible con anillo de alto contraste.
 - Sin dependencia de mouse.

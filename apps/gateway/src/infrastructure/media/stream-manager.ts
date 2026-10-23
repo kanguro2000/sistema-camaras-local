@@ -1,4 +1,4 @@
-import { FfmpegStream } from "./ffmpeg-stream.js";
+import { FfmpegStream, StreamFailure } from "./ffmpeg-stream.js";
 import path from "node:path";
 import { CameraStreamHealth } from "../../domain/services/camera-stream-manager.js";
 
@@ -7,16 +7,16 @@ const IDLE_TIMEOUT_MS = 30_000;
 export class StreamManager {
   private streams = new Map<string, FfmpegStream>();
   private idleTimers = new Map<string, NodeJS.Timeout>();
-  private baseDir: string;
 
-  constructor(baseDir = path.resolve("./data/streams")) {
-    this.baseDir = baseDir;
-  }
+  constructor(
+    private readonly baseDir = path.resolve("./data/streams"),
+    private readonly onFailure?: (failure: StreamFailure) => void,
+  ) {}
 
   get(cameraId: string): FfmpegStream {
     let s = this.streams.get(cameraId);
     if (!s) {
-      s = new FfmpegStream(cameraId, path.join(this.baseDir, cameraId));
+      s = new FfmpegStream(cameraId, path.join(this.baseDir, cameraId), this.onFailure);
       this.streams.set(cameraId, s);
     }
     return s;
@@ -61,5 +61,3 @@ export class StreamManager {
     return s ? s.health : { status: "stopped", restarts: 0 };
   }
 }
-
-export const streamManager = new StreamManager();

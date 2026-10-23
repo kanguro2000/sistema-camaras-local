@@ -12,6 +12,7 @@
 
 ### Auth
 - `POST /api/auth/login` { username, password } → { accessToken, refreshToken, user }
+- `GET /api/auth/me` → usuario autenticado (id, username, role)
 - `POST /api/auth/refresh` { refreshToken } → { accessToken }
 - `POST /api/auth/logout`
 
@@ -23,11 +24,11 @@
 
 ### Cameras
 - `GET /api/cameras` → lista (sin credenciales)
-- `POST /api/cameras` → crea (probe RTSP)
+- `POST /api/cameras` (admin) → crea y cifra las credenciales
 - `GET /api/cameras/:id`
-- `PATCH /api/cameras/:id`
-- `DELETE /api/cameras/:id`
-- `POST /api/cameras/:id/probe` → valida conectividad
+- `PATCH /api/cameras/:id` (admin)
+- `DELETE /api/cameras/:id` (admin)
+- `POST /api/cameras/:id/probe` (admin) → valida conectividad
 - `GET /api/cameras/:id/stream` → emite cookie de acceso temporal y devuelve URL HLS relativa
 - `GET /api/cameras/:id/snapshot` → image/jpeg
 - `POST /api/cameras/:id/ptz` { action: 'up'|'down'|'left'|'right'|'zoomin'|'zoomout'|'home'|'preset', speed?, presetId? }
