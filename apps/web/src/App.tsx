@@ -1,27 +1,40 @@
-import React, { useEffect, useState } from "react";
-import { useStore } from "./store.js";
-import { api } from "./lib/api.js";
+import React, { useCallback, useEffect, useState } from "react";
+import { AppService } from "./application/services/app-service.js";
+import { AppStore } from "./store.js";
 import HlsPlayer from "./components/HlsPlayer.js";
 import CameraTile from "./components/CameraTile.js";
 
 type View = "login" | "grid" | "fullscreen";
 
-export default function App() {
-  const { token, user, setAuth, logout, cameras, setCameras } = useStore();
+export default function App({ service, store }: { service: AppService; store: AppStore }) {
+  const { token, user, setAuth, logout, cameras, setCameras } = store();
   const [view, setView] = useState<View>(token ? "grid" : "login");
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
   const [fullId, setFullId] = useState<string | null>(null);
+  const [fullSrc, setFullSrc] = useState<string | null>(null);
+
+  const openCamera = useCallback(async (cameraId: string) => {
+    setError(null);
+    try {
+      const stream = await service.openStream(cameraId);
+      setFullId(cameraId);
+      setFullSrc(stream.hlsUrl);
+      setView("fullscreen");
+    } catch (err) {
+      setError(String(err));
+    }
+  }, [service]);
 
   // Load cameras when authenticated
   useEffect(() => {
     if (!token) return;
-    api<{ items: any[] }>("/api/cameras")
-      .then((d) => setCameras(d.items ?? []))
+    service.listCameras()
+      .then(setCameras)
       .catch((e) => setError(String(e)));
-  }, [token]);
+  }, [service, token, setCameras]);
 
   // D-pad navigation for grid
   useEffect(() => {
@@ -32,10 +45,7 @@ export default function App() {
       else if (e.key === "ArrowDown") setSelected((s) => Math.min(s + 2, cameras.length - 1));
       else if (e.key === "ArrowUp") setSelected((s) => Math.max(s - 2, 0));
       else if (e.key === "Enter") {
-        if (cameras[selected]) {
-          setFullId(cameras[selected].id);
-          setView("fullscreen");
-        }
+        if (cameras[selected]) void openCamera(cameras[selected].id);
       } else if (e.key === "Escape" || e.key === "Backspace") {
         logout();
         setView("login");
@@ -43,7 +53,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [view, cameras, selected]);
+  }, [view, cameras, selected, openCamera, logout]);
 
   // Fullscreen back
   useEffect(() => {
@@ -52,20 +62,32 @@ export default function App() {
       if (e.key === "Escape" || e.key === "Backspace") {
         setView("grid");
         setFullId(null);
+        setFullSrc(null);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [view]);
 
+  useEffect(() => {
+    if (view !== "fullscreen" || !fullId) return;
+    const refreshTicket = () => {
+      if (document.visibilityState !== "visible") return;
+      void service.refreshStreamTicket(fullId).catch((err) => setError(String(err)));
+    };
+    const timer = window.setInterval(refreshTicket, 45 * 60 * 1000);
+    document.addEventListener("visibilitychange", refreshTicket);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshTicket);
+    };
+  }, [service, view, fullId]);
+
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
-      const res = await api<{ accessToken: string; user: any }>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ username, password }),
-      });
+      const res = await service.login(username, password);
       setAuth(res.accessToken, res.user);
       setView("grid");
     } catch (err) {
@@ -87,12 +109,11 @@ export default function App() {
     );
   }
 
-  if (view === "fullscreen" && fullId) {
+  if (view === "fullscreen" && fullId && fullSrc) {
     const cam = cameras.find((c) => c.id === fullId);
-    const src = `/streams/${fullId}/index.m3u8`;
     return (
       <div className="fullscreen">
-        <HlsPlayer src={src} className="video-full" />
+        <HlsPlayer src={fullSrc} className="video-full" />
         <div className="overlay">
           <span>{cam?.name}</span>
           <span>Back: volver</span>
@@ -114,8 +135,7 @@ export default function App() {
             selected={i === selected}
             onSelect={() => {
               setSelected(i);
-              setFullId(c.id);
-              setView("fullscreen");
+              void openCamera(c.id);
             }}
           />
         ))}

@@ -47,6 +47,12 @@
 - **Decisión**: Una sola codebase web. Empaquetado específico: Vidaa .ipk para Hisense, APK (WebView/ExoPlayer) para TCL Android.
 - **Estado**: Aceptada (a implementar v1).
 
+### ADR-008 — Dependencias invertidas y composición por puertos
+- **Decisión**: El dominio define puertos; aplicación e interfaces dependen de esos contratos, mientras infraestructura implementa adaptadores. Gateway y web conectan dependencias en sus composition roots.
+- **Alcance inicial**: autenticación (hasher y tokens), probe RTSP, stream runtime, rutas HLS, servicio web y almacenamiento de token del navegador.
+- **Motivo**: aislar reglas de negocio de Fastify, JWT, bcrypt, SQLite, FFmpeg, `fetch` y `localStorage`; facilitar pruebas con dobles.
+- **Estado**: En adopción incremental; aplicar la regla en cambios nuevos y ampliar tests reales de shared/web y linting en próximos pasos.
+
 ## 3. Restricciones y supuestos
 
 - Red local (LAN). No se asume internet en runtime.

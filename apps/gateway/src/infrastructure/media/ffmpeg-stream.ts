@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { config } from "../../config.js";
+import { redactRtspCredentials } from "../security/secret-redaction.js";
 
 export interface StreamHealth {
   status: "starting" | "running" | "stopped" | "error";
@@ -69,7 +69,7 @@ export class FfmpegStream {
     this.proc.on("error", (err) => {
       this.proc = null;
       this.health.status = "error";
-      this.health.lastError = `Failed to spawn ffmpeg: ${err.message}`;
+      this.health.lastError = redactRtspCredentials(`Failed to spawn ffmpeg: ${err.message}`);
       this.scheduleRestart();
     });
     this.proc.stdout?.on("data", () => {
@@ -77,7 +77,7 @@ export class FfmpegStream {
     });
     this.proc.stderr?.on("data", (d: Buffer) => {
       const msg = d.toString().trim();
-      if (msg) this.health.lastError = msg.slice(-500);
+      if (msg) this.health.lastError = redactRtspCredentials(msg).slice(-500);
     });
     this.proc.on("exit", (code) => {
       this.proc = null;

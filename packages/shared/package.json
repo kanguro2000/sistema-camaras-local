@@ -8,13 +8,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"lint shared ok\"",
-    "test": "echo \"test shared ok\""
+    "lint": "eslint src test",
+    "test": "tsx --test test/contracts.test.ts"
   },
   "dependencies": {
-    "zod": "^3.23.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "tsx": "^4.23.15",
     "typescript": "^5.5.0"
   }
 }

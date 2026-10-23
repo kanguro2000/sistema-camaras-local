@@ -1,22 +1,30 @@
 import { FastifyInstance } from "fastify";
 import { CameraCreateSchema, CameraUpdateSchema } from "@sistema-camaras/shared";
+import { AuthService } from "../../../application/services/auth.service.js";
 import { CameraService } from "../../../application/services/camera.service.js";
-import { streamManager } from "../../../infrastructure/media/stream-manager.js";
+import { CameraStreamService } from "../../../application/services/camera-stream.service.js";
+import { StreamTicketService } from "../../../domain/services/stream-ticket-service.js";
 import { requireAuth, requireRole } from "../guards/auth.guard.js";
-import { config } from "../../../config.js";
+import { streamTicketCookie } from "../guards/stream-ticket.guard.js";
 
-export function cameraRoutesFactory(service: CameraService) {
+export function cameraRoutesFactory(
+  service: CameraService,
+  auth: AuthService,
+  streamTickets: StreamTicketService,
+  streams: CameraStreamService,
+) {
+  const authenticate = requireAuth(auth);
   return async function cameraRoutes(app: FastifyInstance) {
-    app.get("/api/cameras", { preHandler: requireAuth }, async () => ({ items: service.list() }));
+    app.get("/api/cameras", { preHandler: authenticate }, async () => ({ items: service.list() }));
 
-    app.get("/api/cameras/:id", { preHandler: requireAuth }, async (req, reply) => {
+    app.get("/api/cameras/:id", { preHandler: authenticate }, async (req, reply) => {
       const { id } = req.params as { id: string };
       const cam = service.get(id);
       if (!cam) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
       return cam;
     });
 
-    app.post("/api/cameras", { preHandler: requireRole("admin") }, async (req, reply) => {
+    app.post("/api/cameras", { preHandler: requireRole(auth, "admin") }, async (req, reply) => {
       const parsed = CameraCreateSchema.safeParse(req.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: { code: "VALIDATION_ERROR", message: "Invalid payload", details: parsed.error.flatten() } });
@@ -25,7 +33,7 @@ export function cameraRoutesFactory(service: CameraService) {
       return reply.code(201).send(cam);
     });
 
-    app.patch("/api/cameras/:id", { preHandler: requireRole("admin") }, async (req, reply) => {
+    app.patch("/api/cameras/:id", { preHandler: requireRole(auth, "admin") }, async (req, reply) => {
       const { id } = req.params as { id: string };
       if (!service.get(id)) {
         return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
@@ -38,7 +46,7 @@ export function cameraRoutesFactory(service: CameraService) {
       return cam;
     });
 
-    app.delete("/api/cameras/:id", { preHandler: requireRole("admin") }, async (req, reply) => {
+    app.delete("/api/cameras/:id", { preHandler: requireRole(auth, "admin") }, async (req, reply) => {
       const { id } = req.params as { id: string };
       if (!service.delete(id)) {
         return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
@@ -46,38 +54,37 @@ export function cameraRoutesFactory(service: CameraService) {
       return reply.code(204).send();
     });
 
-    app.post("/api/cameras/:id/probe", { preHandler: requireRole("admin") }, async (req, reply) => {
+    app.post("/api/cameras/:id/probe", { preHandler: requireRole(auth, "admin") }, async (req, reply) => {
       const { id } = req.params as { id: string };
       if (!service.get(id)) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
       const result = await service.probe(id);
       return result;
     });
 
-    app.get("/api/cameras/:id/health", { preHandler: requireAuth }, async (req, reply) => {
+    app.get("/api/cameras/:id/health", { preHandler: authenticate }, async (req, reply) => {
       const { id } = req.params as { id: string };
       if (!service.get(id)) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
-      return streamManager.health(id);
+      return streams.health(id);
     });
 
-    app.get("/api/cameras/:id/stream", { preHandler: requireAuth }, async (req, reply) => {
+    app.get("/api/cameras/:id/stream", { preHandler: authenticate }, async (req, reply) => {
       const { id } = req.params as { id: string };
-      const cam = service.get(id);
-      if (!cam) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
-      const secret = service.getWithSecret(id)!;
-      const streamPath = secret.camera.channel === "sd" ? "/stream2" : "/stream1";
-      const rtspUrl = `rtsp://${encodeURIComponent(secret.username)}:${encodeURIComponent(secret.password)}@${secret.camera.ip}:554${streamPath}`;
-      await streamManager.ensureRunning(id, rtspUrl);
-      const base = `${req.protocol}://${req.headers.host}`;
+      const stream = await streams.start(id);
+      if (!stream) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
+      if (!req.user) return reply.code(401).send({ error: { code: "UNAUTHORIZED", message: "Missing user identity" } });
+      const ticket = streamTickets.issue(req.user.sub, id);
+      reply.header("Set-Cookie", streamTicketCookie(ticket, id, req.protocol === "https"));
+      reply.header("Cache-Control", "no-store");
       return {
-        hlsUrl: `${base}/streams/${id}/index.m3u8`,
-        health: streamManager.health(id),
+        hlsUrl: `/streams/${id}/index.m3u8`,
+        health: stream.health,
       };
     });
 
-    app.post("/api/cameras/:id/stream/stop", { preHandler: requireRole("admin") }, async (req, reply) => {
+    app.post("/api/cameras/:id/stream/stop", { preHandler: requireRole(auth, "admin") }, async (req, reply) => {
       const { id } = req.params as { id: string };
       if (!service.get(id)) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Camera not found" } });
-      streamManager.stop(id);
+      streams.stop(id);
       return { status: "stopped" };
     });
   };

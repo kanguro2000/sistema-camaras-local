@@ -1,6 +1,6 @@
 import { FfmpegStream } from "./ffmpeg-stream.js";
 import path from "node:path";
-import { config } from "../../config.js";
+import { CameraStreamHealth } from "../../domain/services/camera-stream-manager.js";
 
 const IDLE_TIMEOUT_MS = 30_000;
 
@@ -22,11 +22,14 @@ export class StreamManager {
     return s;
   }
 
-  async ensureRunning(cameraId: string, rtspUrl: string): Promise<FfmpegStream> {
-    const s = this.get(cameraId);
-    if (!s.isRunning()) s.start(rtspUrl);
+  async ensureRunning(cameraId: string, rtspUrl: string): Promise<void> {
+    const stream = this.get(cameraId);
+    if (!stream.isRunning()) stream.start(rtspUrl);
     this.resetIdle(cameraId);
-    return s;
+  }
+
+  playlistPath(cameraId: string): string {
+    return this.get(cameraId).hlsPath;
   }
 
   resetIdle(cameraId: string) {
@@ -53,7 +56,7 @@ export class StreamManager {
     for (const id of this.streams.keys()) this.stop(id);
   }
 
-  health(cameraId: string) {
+  health(cameraId: string): CameraStreamHealth {
     const s = this.streams.get(cameraId);
     return s ? s.health : { status: "stopped", restarts: 0 };
   }

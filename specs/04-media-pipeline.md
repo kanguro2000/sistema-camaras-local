@@ -10,23 +10,25 @@ Entregar video en vivo de cámaras Tapo a TVs con latencia < 2 s (HLS) mantenien
 Cámara (RTSP H.264 + audio)
    │
    ▼
-mediamtx (ingest RTSP)
+Gateway inicia FFmpeg bajo demanda
    │
-   ├── si codec compatible (H.264 + AAC/none) → remux a HLS (copy)
-   └── si incompatible (H.265 o G.711) → ffmpeg transcode → H.264 + AAC
-   │
-   ▼
-HLS segments (≤ 1 s) + playlist m3u8
+   ├── video: passthrough (copy)
+   └── audio: AAC
    │
    ▼
-TV (hls.js / native)
+HLS segments (1 s) + playlist m3u8
+   │
+   ▼
+Gateway autenticado → Nginx proxy → TV (hls.js / native)
 ```
+
+El despliegue actual no usa MediaMTX y no transcodifica H.265 a H.264; esos escenarios requieren validación y una tarea posterior. La ruta de video usa passthrough, por lo que la cámara debe entregar un codec compatible con la TV.
 
 ## 3. Configuración HLS
 
 - Segment duration: 1 s.
 - Playlist size: 3 segments (ventana deslizante).
-- Partes (LL-HLS) opcionales si mediamtx soporta: target 0.5 s.
+- LL-HLS no está habilitado en el pipeline actual.
 - Atributos: `#EXT-X-VERSION:7` si LL-HLS.
 
 ## 4. On-demand
@@ -50,7 +52,7 @@ TV (hls.js / native)
 ## 7. WebRTC (opcional, v1)
 
 - WHEP endpoint por cámara para latencia < 500 ms.
-- Requiere mediamtx con WebRTC habilitado.
+- Requiere integrar MediaMTX u otro relay compatible; aún no implementado.
 - Fallback a HLS si WebRTC falla.
 
 ## 8. Métricas

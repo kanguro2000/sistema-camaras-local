@@ -2,32 +2,41 @@
 
 ## 1. Requisitos de hardware (gateway)
 
-- Servidor objetivo: laptop Lenovo G480 con Ubuntu (gateway + mediamtx en Docker).
+- Servidor objetivo: laptop Lenovo G480 con Ubuntu (gateway y FFmpeg en Docker; web estática en Nginx).
 - PC/Raspberry Pi 4 / NAS con Docker.
 - CPU: 2+ cores (transcode ocasional).
 - RAM: 2 GB mínimo, 4 GB recomendado.
 - Red: Ethernet recomendado, misma LAN que cámaras.
+- Node.js 24 en las imágenes de contenedor; no se instala Node.js en el host Ubuntu.
 
 ## 2. Docker Compose (referencia)
 
 ```yaml
 services:
   gateway:
-    image: sistema-camaras-gateway:latest
-    ports: ["8080:8080"]
-    volumes: ["./data:/data"]
-    env_file: .env
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: gateway
+    expose: ["8080"]
+    volumes: ["../data:/workspace/apps/gateway/data"]
+    env_file: ../.env
     restart: unless-stopped
-  mediamtx:
-    image: bluenviron/mediamtx:latest
-    ports: ["8554:8554", "8888:8888", "8889:8889", "8189:8189/udp"]
-    volumes: ["./mediamtx.yml:/mediamtx.yml"]
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web
+    ports: ["8080:8080"]
+    depends_on: [gateway]
     restart: unless-stopped
 ```
 
+Solo el frontend/proxy publica el puerto `8080` en la LAN. El gateway queda en la red privada de Compose. No se exponen RTSP, HLS interno ni una API de MediaMTX.
+
 ## 3. Variables de entorno
 
-- `PORT`, `JWT_SECRET`, `MASTER_KEY`, `DB_PATH`, `MEDIAMTX_URL`, `LOG_LEVEL`.
+- `PORT`, `JWT_SECRET`, `MASTER_KEY`, `DB_PATH`, `LOG_LEVEL`, `HOST_UID`, `HOST_GID`.
 - `.env.example` documentado; nunca commitear `.env`.
 
 ## 4. Backups
@@ -49,4 +58,4 @@ services:
 ## 7. Modo desarrollo
 
 - `pnpm dev` arranca gateway (watch) + frontend (Vite).
-- mediamtx local o vía Docker.
+- En Ubuntu, `bash deploy/ubuntu-setup.sh` construye las imágenes y valida `/api/health`.

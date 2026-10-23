@@ -2,9 +2,8 @@ import { DatabaseSync } from "node:sqlite";
 import crypto from "node:crypto";
 import { getDatabase } from "../db/sqlite.database.js";
 import { encrypt, decrypt } from "../security/crypto.service.js";
-import { Camera } from "../../domain/entities/camera.js";
+import { Camera, CameraCreateInput, CameraUpdateInput } from "../../domain/entities/camera.js";
 import { CameraRepository } from "../../domain/repositories/camera.repository.js";
-import { CameraCreate, CameraUpdate } from "@sistema-camaras/shared";
 
 interface CameraRow {
   id: string;
@@ -27,7 +26,6 @@ function rowToCamera(row: CameraRow): Camera {
     name: row.name,
     ip: row.ip,
     model: row.model ?? undefined,
-    username: row.username,
     hasCredentials: true,
     channel: row.channel,
     rtspPath: row.rtsp_path,
@@ -61,7 +59,7 @@ export class SqliteCameraRepository implements CameraRepository {
     return { camera: rowToCamera(row), username: row.username, password: decrypt(row.password_enc) };
   }
 
-  create(input: CameraCreate): Camera {
+  create(input: CameraCreateInput): Camera {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const enc = encrypt(input.password);
@@ -85,12 +83,12 @@ export class SqliteCameraRepository implements CameraRepository {
     return this.getById(id)!;
   }
 
-  update(id: string, input: CameraUpdate): Camera | null {
+  update(id: string, input: CameraUpdateInput): Camera | null {
     const existing = this.db.prepare("SELECT * FROM cameras WHERE id = ?").get(id) as unknown as CameraRow | undefined;
     if (!existing) return null;
     const now = new Date().toISOString();
     const fields: string[] = [];
-    const values: unknown[] = [];
+    const values: (string | number | null)[] = [];
     if (input.name !== undefined) { fields.push("name = ?"); values.push(input.name); }
     if (input.ip !== undefined) { fields.push("ip = ?"); values.push(input.ip); }
     if (input.model !== undefined) { fields.push("model = ?"); values.push(input.model ?? null); }
@@ -101,7 +99,7 @@ export class SqliteCameraRepository implements CameraRepository {
     fields.push("updated_at = ?");
     values.push(now);
     values.push(id);
-    this.db.prepare(`UPDATE cameras SET ${fields.join(", ")} WHERE id = ?`).run(...(values as any));
+    this.db.prepare(`UPDATE cameras SET ${fields.join(", ")} WHERE id = ?`).run(...values);
     return this.getById(id);
   }
 

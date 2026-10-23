@@ -6,9 +6,9 @@ export type CameraChannel = z.infer<typeof CameraChannelSchema>;
 export const CameraSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(64),
-  ip: z.string().ip(),
+  ip: z.union([z.ipv4(), z.ipv6()]),
   model: z.string().optional(),
-  username: z.string(),
+  hasCredentials: z.boolean().default(true),
   channel: CameraChannelSchema.default("hd"),
   rtspPath: z.string().default("/stream1"),
   enabled: z.boolean().default(true),
@@ -20,7 +20,7 @@ export type Camera = z.infer<typeof CameraSchema>;
 
 export const CameraCreateSchema = z.object({
   name: z.string().min(1).max(64),
-  ip: z.string().ip(),
+  ip: z.union([z.ipv4(), z.ipv6()]),
   model: z.string().optional(),
   username: z.string().min(1),
   password: z.string().min(1),
