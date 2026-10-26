@@ -24,12 +24,16 @@ Reglas:
 | Job              | Cuándo                                     | Qué hace                                                                             |
 | ---------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
 | `branch-flow`    | PR hacia `develop`, `staging` o `master`   | Verifica el origen permitido del PR.                                                 |
-| `validate`       | PR y push a las tres ramas                 | Instala, lint, typecheck, pruebas unitarias y E2E, build.                            |
+| `validate`       | PR y push a las tres ramas                 | Instala, lint, typecheck, pruebas unitarias, build, auditoría y cobertura.           |
+| `e2e`            | PR y push a las tres ramas                 | Pruebas E2E con Playwright, en paralelo a `validate` y con caché de Chromium.        |
 | `deploy-checks`  | PR y push a las tres ramas                 | ShellCheck de `deploy/*.sh`, `docker compose config` y build de las imágenes Docker. |
 | `rtsp-integration` | PR y push a las tres ramas               | Levanta MediaMTX y una cámara RTSP simulada (FFmpeg) y prueba el gateway de punta a punta. |
 | `publish-images` | Solo push (tras fusionar) a las tres ramas | Publica `gateway` y `web` en GHCR con la etiqueta del ambiente y `sha-<commit>`.     |
 | `promote`        | Push a `develop` o `staging`               | Abre el PR de promoción a la rama siguiente si hay cambios y no existe uno abierto.  |
 
+<<<<<<< HEAD
+`publish-images` y `promote` solo se ejecutan si `validate`, `e2e` y `deploy-checks` pasan.
+=======
 `publish-images` y `promote` solo se ejecutan si `validate`, `deploy-checks` y `rtsp-integration` pasan.
 
 ### Prueba con cámara RTSP simulada
@@ -42,6 +46,7 @@ RTSP_INTEGRATION=1 pnpm test:rtsp
 ```
 
 Sin `RTSP_INTEGRATION=1` las pruebas se omiten, por lo que `pnpm test` sigue sin requerir FFmpeg.
+>>>>>>> origin/develop
 
 ### Seguridad y calidad
 
@@ -98,7 +103,7 @@ No se puede aplicar desde el repositorio; hazlo en **Settings**:
 1. **Actions → General → Workflow permissions**: activar _Allow GitHub Actions to create and approve pull requests_ (necesario para `promote`).
 2. **Rules → Rulesets** (o Branch protection) para `develop`, `staging` y `master`:
    - Exigir PR antes de fusionar y bloquear force-push y borrado.
-   - Exigir los checks `validate`, `deploy-checks` y `branch-flow`.
+   - Exigir los checks `validate`, `e2e`, `deploy-checks` y `branch-flow`.
    - Exigir que la rama esté actualizada antes de fusionar.
 3. **General → Pull Requests**: activar _Automatically delete head branches_ (no afecta a `develop` y `staging`, que están protegidas).
 4. **Packages**: tras la primera publicación, enlazar o ajustar la visibilidad de los paquetes de GHCR según prefieras.
