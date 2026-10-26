@@ -3,6 +3,42 @@ import fs from "node:fs";
 import path from "node:path";
 import { redactRtspCredentials } from "../security/secret-redaction.js";
 
+export function hasPlayableHlsOutput(outputDir: string): boolean {
+  const playlistPath = path.join(outputDir, "index.m3u8");
+  if (!fs.existsSync(playlistPath)) return false;
+
+  let playlist: string;
+  try {
+    playlist = fs.readFileSync(playlistPath, "utf8");
+  } catch (error) {
+    if (isMissingFileError(error)) return false;
+    throw error;
+  }
+  if (!playlist.startsWith("#EXTM3U")) return false;
+
+  const segments = playlist
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+
+  return segments.some((segment) => {
+    if (path.basename(segment) !== segment || !segment.endsWith(".ts")) return false;
+    const segmentPath = path.join(outputDir, segment);
+    if (!fs.existsSync(segmentPath)) return false;
+    try {
+      const stat = fs.statSync(segmentPath);
+      return stat.isFile() && stat.size > 0;
+    } catch (error) {
+      if (isMissingFileError(error)) return false;
+      throw error;
+    }
+  });
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
 export interface StreamHealth {
   status: "starting" | "running" | "stopped" | "error";
   pid?: number;
@@ -37,9 +73,7 @@ export class FfmpegStream {
 
   refreshHealth() {
     if (this.proc && this.health.status === "starting") {
-      const hasPlaylist = fs.existsSync(this.hlsPath);
-      const hasSegment = fs.readdirSync(this.outputDir).some((file) => file.endsWith(".ts"));
-      if (hasPlaylist && hasSegment) {
+      if (hasPlayableHlsOutput(this.outputDir)) {
         this.health = { ...this.health, status: "running", lastError: undefined };
       }
     }

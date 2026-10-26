@@ -4,7 +4,9 @@ import {
   CameraCreateSchema,
   CameraProbeResultSchema,
   CameraSchema,
+  CameraStreamStatusSchema,
   CameraStreamHealthSchema,
+  HealthSchema,
   LoginSchema,
 } from "../src/index.js";
 
@@ -48,10 +50,21 @@ test("camera probe contract validates success and failure results", () => {
 });
 
 test("camera stream health contract reports runtime states", () => {
-  assert.equal(CameraStreamHealthSchema.safeParse({ status: "running", restarts: 0 }).success, true);
+  const statuses = ["starting", "running", "stopped", "error"] as const;
+  for (const status of statuses) {
+    assert.equal(CameraStreamStatusSchema.safeParse(status).success, true);
+    assert.equal(HealthSchema.safeParse({ status }).success, true);
+    assert.equal(CameraStreamHealthSchema.safeParse({ status, restarts: 0 }).success, true);
+  }
+  for (const status of ["online", "offline", "connecting"]) {
+    assert.equal(CameraStreamStatusSchema.safeParse(status).success, false);
+  }
   assert.equal(
-    CameraStreamHealthSchema.safeParse({ status: "error", restarts: 2, lastError: "FFmpeg failed" }).success,
+    CameraStreamHealthSchema.safeParse({
+      status: "error",
+      restarts: 2,
+      lastError: "FFmpeg failed",
+    }).success,
     true,
   );
-  assert.equal(CameraStreamHealthSchema.safeParse({ status: "online", restarts: 0 }).success, false);
 });
