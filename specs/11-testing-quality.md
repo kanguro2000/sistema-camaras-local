@@ -2,10 +2,11 @@
 
 ## 1. Niveles
 
-- **Unit**: lógica de dominio, cifrado, validación (Vitest).
-- **Integration**: API endpoints con DB en memoria (Vitest + supertest).
-- **E2E**: flujos web con Playwright (login, ver stream mock, CRUD cámara).
+- **Unit**: lógica de dominio, cifrado y validación con el test runner de Node.js.
+- **E2E web**: flujos en navegador con Playwright: login, videowall/fullscreen y administración CRUD usando respuestas de API simuladas.
 - **Manual TV**: checklist en TV real (Hisense/TCL).
+
+El comando canónico `pnpm test` ejecuta las pruebas de los paquetes y, al terminar, la suite Playwright. Para ejecutar solo la suite de navegador: `pnpm test:e2e`. Playwright levanta Vite en `127.0.0.1:4173`; las rutas del gateway se simulan y no requieren cámara ni Docker.
 
 ## 2. Cobertura mínima
 
@@ -14,13 +15,15 @@
 
 ## 3. CI (GitHub Actions)
 
-- Lint + typecheck + tests en PR.
-- Build de imágenes Docker.
-- (Opcional) E2E contra gateway mock.
+- El workflow `.github/workflows/ci.yml` ejecuta lint, typecheck, `pnpm test` y build en push y pull request.
+- CI usa Node.js 24, de acuerdo con `package.json` y la spec de despliegue.
+- Instala Chromium de Playwright; las pruebas E2E usan un gateway simulado y no requieren Docker ni cámaras reales.
+- La construcción de imágenes Docker queda fuera de este workflow de validación.
 
 ## 4. Mocks de cámara
 
-- Usar un servidor RTSP mock (mediamtx con archivo de video) para tests E2E.
+- Los E2E web actuales simulan las rutas HTTP del gateway y abortan las solicitudes de segmentos HLS; validan flujos y UI, no el pipeline real de video.
+- Para pruebas futuras de integración del pipeline, usar un servidor RTSP mock (mediamtx con archivo de video).
 - No depender de hardware real en CI.
 
 ## 5. Checklist manual TV

@@ -30,7 +30,8 @@
 - **Estado**: Aceptada.
 
 ### ADR-004 — Stack base Node/TypeScript + mediamtx
-- **Decisión**: Gateway en Node.js 20 + Fastify; relay con mediamtx; frontend React+Vite.
+- **Decisión**: Gateway en Node.js 24 + Fastify; relay con mediamtx; frontend React+Vite.
+- **Motivo de actualización**: `package.json` requiere Node.js >=24 y las imágenes de despliegue usan Node.js 24; esta versión es el mínimo soportado para desarrollo y CI.
 - **Alternativa**: Python/FastAPI + go2rtc (aprobada como equivalente si el equipo lo prefiere).
 - **Estado**: Aceptada (base).
 
@@ -98,6 +99,7 @@
 
 ## 7. Historial de cambios
 
+- 2026-10-26: Se alinea Node.js 24 como versión mínima del proyecto y se integra Playwright E2E al comando canónico `pnpm test` y CI.
 - 2026-10-21: Creación inicial de memoria y documentación base (PROMPT, AGENTS, specs, skills).
 
 ---

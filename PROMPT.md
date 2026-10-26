@@ -31,7 +31,7 @@ Construir una aplicación **local-first** que permita ver en vivo, en una TV, el
 
 | Capa | Tecnología |
 |------|-----------|
-| Lenguaje backend | TypeScript (Node.js 20 LTS) |
+| Lenguaje backend | TypeScript (Node.js 24) |
 | Framework API | Fastify (o Express) + Zod para validación |
 | Base de datos | SQLite (better-sqlite3) para config/usuarios/cámaras |
 | Media relay | mediamtx (binario) + ffmpeg para transcode audio |
@@ -40,7 +40,7 @@ Construir una aplicación **local-first** que permita ver en vivo, en una TV, el
 | Estilos | Tailwind CSS + focus-visible para TV |
 | Reproductor | hls.js (fallback nativo `<video>`) |
 | Estado | Zustand |
-| Testing | Vitest + Playwright (E2E web) |
+| Testing | Node.js test runner + Playwright (E2E web) |
 | Empaquetado TV | Vidaa SDK (.ipk), Android (Capacitor o WebView nativo) |
 | Contenedores | Docker Compose para el gateway |
 
