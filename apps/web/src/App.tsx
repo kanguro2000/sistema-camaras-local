@@ -1,11 +1,21 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CameraStreamHealth } from "@sistema-camaras/shared";
 import { AppService } from "./application/services/app-service.js";
 import { AppStore } from "./store.js";
-import HlsPlayer from "./components/HlsPlayer.js";
+import StreamPlayer from "./components/StreamPlayer.js";
 import CameraTile, { type CameraPlaybackStatus } from "./components/CameraTile.js";
-import CameraManagement from "./components/CameraManagement.js";
 import { getSpatialDirection, isRemoteBackKey, navigateSpatially } from "./lib/spatial-navigation.js";
+
+const CameraManagement = lazy(() => import("./components/CameraManagement.js"));
 
 type View = "login" | "grid" | "fullscreen" | "manage";
 type CameraStreamState = {
@@ -328,7 +338,7 @@ export default function App({ service, store }: { service: AppService; store: Ap
     const cam = cameras.find((c) => c.id === fullId);
     return (
       <div className="fullscreen">
-        <HlsPlayer
+        <StreamPlayer
           key={fullRetryKey}
           src={fullSrc}
           className="video-full"
@@ -359,15 +369,23 @@ export default function App({ service, store }: { service: AppService; store: Ap
 
   if (view === "manage") {
     return (
-      <CameraManagement
-        cameras={cameras}
-        service={service}
-        onCamerasChanged={refreshCameras}
-        onBack={() => {
-          restoreGridFocus.current = true;
-          setView("grid");
-        }}
-      />
+      <Suspense
+        fallback={(
+          <main className="camera-management" role="status">
+            Cargando administración…
+          </main>
+        )}
+      >
+        <CameraManagement
+          cameras={cameras}
+          service={service}
+          onCamerasChanged={refreshCameras}
+          onBack={() => {
+            restoreGridFocus.current = true;
+            setView("grid");
+          }}
+        />
+      </Suspense>
     );
   }
 

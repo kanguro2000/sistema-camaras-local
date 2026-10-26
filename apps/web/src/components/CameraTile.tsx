@@ -1,5 +1,5 @@
 import React from "react";
-import HlsPlayer from "./HlsPlayer.js";
+import StreamPlayer from "./StreamPlayer.js";
 
 export type CameraPlaybackStatus = "loading" | "playing" | "error";
 
@@ -50,7 +50,7 @@ export default function CameraTile({
           : `${name}: cámara deshabilitada.`}
       >
         {src && (
-          <HlsPlayer
+          <StreamPlayer
             src={src}
             className="tile-video"
             onPlaybackStatusChange={onPlaybackStatusChange}
