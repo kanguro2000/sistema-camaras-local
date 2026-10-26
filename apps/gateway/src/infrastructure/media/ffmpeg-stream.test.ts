@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { FfmpegStream, hasPlayableHlsOutput } from "./ffmpeg-stream.js";
+import { StreamManager } from "./stream-manager.js";
 
 test("HLS output is not ready until a playlist references a non-empty segment", () => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "camera-stream-health-"));
@@ -118,4 +119,10 @@ test("a process that never produces video is restarted after the startup timeout
     stream.stop();
     fs.rmSync(workDir, { recursive: true, force: true });
   }
+});
+
+test("StreamManager rechaza ids que no son UUID (path traversal)", () => {
+  const manager = new StreamManager(os.tmpdir());
+  assert.throws(() => manager.get("../../etc"), /Invalid camera id/);
+  assert.doesNotThrow(() => manager.get("123e4567-e89b-12d3-a456-426614174000"));
 });

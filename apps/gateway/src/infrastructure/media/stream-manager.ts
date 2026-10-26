@@ -3,6 +3,7 @@ import path from "node:path";
 import { CameraStreamHealth } from "../../domain/services/camera-stream-manager.js";
 
 const IDLE_TIMEOUT_MS = 30_000;
+const CAMERA_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class StreamManager {
   private streams = new Map<string, FfmpegStream>();
@@ -16,6 +17,8 @@ export class StreamManager {
   get(cameraId: string): FfmpegStream {
     let s = this.streams.get(cameraId);
     if (!s) {
+      // El id forma parte de una ruta en disco: solo se aceptan UUID para evitar path traversal.
+      if (!CAMERA_ID_PATTERN.test(cameraId)) throw new Error("Invalid camera id");
       s = new FfmpegStream(cameraId, path.join(this.baseDir, cameraId), this.onFailure);
       this.streams.set(cameraId, s);
     }
