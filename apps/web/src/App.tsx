@@ -13,6 +13,7 @@ import { AppService } from "./application/services/app-service.js";
 import { AppStore } from "./store.js";
 import StreamPlayer from "./components/StreamPlayer.js";
 import CameraTile, { type CameraPlaybackStatus } from "./components/CameraTile.js";
+import { applyCameraOrder, loadCameraOrder, moveCamera, saveCameraOrder } from "./lib/camera-order.js";
 import { getSpatialDirection, isRemoteBackKey, navigateSpatially } from "./lib/spatial-navigation.js";
 
 const CameraManagement = lazy(() => import("./components/CameraManagement.js"));
@@ -27,6 +28,7 @@ type CameraStreamState = {
 
 const CAMERAS_PER_PAGE = 4;
 const HEALTH_POLL_INTERVAL_MS = 10_000;
+const TICKET_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 
 function streamStatusLabel(
   enabled: boolean,
@@ -44,7 +46,10 @@ function streamStatusLabel(
 }
 
 export default function App({ service, store }: { service: AppService; store: AppStore }) {
-  const { token, user, setAuth, setUser, logout, cameras, setCameras } = store();
+  const { token, user, setAuth, setUser, logout, cameras: storedCameras, setCameras } = store();
+  const [cameraOrder, setCameraOrder] = useState<string[]>(() => loadCameraOrder());
+  const cameras = useMemo(() => applyCameraOrder(storedCameras, cameraOrder), [storedCameras, cameraOrder]);
+  const pendingMoveFocus = useRef<{ cameraId: string; move: "before" | "after" } | null>(null);
   const [view, setView] = useState<View>(token ? "grid" : "login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -66,6 +71,28 @@ export default function App({ service, store }: { service: AppService; store: Ap
     () => cameras.slice(currentPage * CAMERAS_PER_PAGE, (currentPage + 1) * CAMERAS_PER_PAGE),
     [cameras, currentPage],
   );
+
+  const moveCameraTile = useCallback((cameraId: string, offset: -1 | 1) => {
+    const ids = cameras.map((camera) => camera.id);
+    const next = moveCamera(ids, cameraId, offset);
+    const newIndex = next.indexOf(cameraId);
+    if (next.every((id, index) => id === ids[index])) return;
+    pendingMoveFocus.current = { cameraId, move: offset < 0 ? "before" : "after" };
+    setCameraOrder(next);
+    saveCameraOrder(next);
+    setPage(Math.floor(newIndex / CAMERAS_PER_PAGE));
+    setSelected(newIndex);
+  }, [cameras]);
+
+  useLayoutEffect(() => {
+    const pending = pendingMoveFocus.current;
+    if (!pending || view !== "grid") return;
+    pendingMoveFocus.current = null;
+    const container = document.querySelector<HTMLElement>(`[data-camera-id="${pending.cameraId}"]`);
+    const preferred = container?.querySelector<HTMLButtonElement>(`[data-move="${pending.move}"]:not(:disabled)`);
+    const fallback = container?.querySelector<HTMLButtonElement>(".tile-move:not(:disabled)");
+    (preferred ?? fallback)?.focus();
+  });
 
   const refreshCameras = useCallback(async () => {
     setCameras(await service.listCameras());
@@ -214,6 +241,18 @@ export default function App({ service, store }: { service: AppService; store: Ap
       active = false;
       window.clearInterval(timer);
     };
+  }, [service, token, view, visibleCameras]);
+
+  useEffect(() => {
+    if (view !== "grid" || !token) return;
+    const refreshTickets = () => {
+      if (document.visibilityState !== "visible") return;
+      for (const camera of visibleCameras) {
+        if (camera.enabled) void service.refreshStreamTicket(camera.id).catch(() => undefined);
+      }
+    };
+    const timer = window.setInterval(refreshTickets, TICKET_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(timer);
   }, [service, token, view, visibleCameras]);
 
   useLayoutEffect(() => {
@@ -408,12 +447,16 @@ export default function App({ service, store }: { service: AppService; store: Ap
           return (
           <CameraTile
             key={c.id}
+            id={c.id}
             index={cameraIndex}
             name={c.name}
             enabled={c.enabled}
             src={streamState?.hlsUrl}
             status={status}
             selected={cameraIndex === selected}
+            onMove={cameras.length > 1 ? (offset) => moveCameraTile(c.id, offset) : undefined}
+            canMoveBefore={cameraIndex > 0}
+            canMoveAfter={cameraIndex < cameras.length - 1}
             onRetry={c.enabled && (
               streamState?.requestFailed
               || streamState?.health?.status === "error"
