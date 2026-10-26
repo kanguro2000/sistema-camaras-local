@@ -143,9 +143,29 @@ header { margin-bottom: 16px; }
   font: inherit;
   cursor: pointer;
 }
-.tile-retry:focus-visible {
+.tile-retry:focus-visible,
+.tile-move:focus-visible {
   outline: 3px solid #4f8cff;
   outline-offset: 2px;
+}
+.tile-order {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.tile-move {
+  flex: 1;
+  border: 1px solid #3d4a63;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #1f2a3d;
+  color: #e6e9ef;
+  font: inherit;
+  cursor: pointer;
+}
+.tile-move:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .camera-pagination {
   display: flex;
