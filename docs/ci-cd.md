@@ -26,10 +26,22 @@ Reglas:
 | `branch-flow`    | PR hacia `develop`, `staging` o `master`   | Verifica el origen permitido del PR.                                                 |
 | `validate`       | PR y push a las tres ramas                 | Instala, lint, typecheck, pruebas unitarias y E2E, build.                            |
 | `deploy-checks`  | PR y push a las tres ramas                 | ShellCheck de `deploy/*.sh`, `docker compose config` y build de las imágenes Docker. |
+| `rtsp-integration` | PR y push a las tres ramas               | Levanta MediaMTX y una cámara RTSP simulada (FFmpeg) y prueba el gateway de punta a punta. |
 | `publish-images` | Solo push (tras fusionar) a las tres ramas | Publica `gateway` y `web` en GHCR con la etiqueta del ambiente y `sha-<commit>`.     |
 | `promote`        | Push a `develop` o `staging`               | Abre el PR de promoción a la rama siguiente si hay cambios y no existe uno abierto.  |
 
-`publish-images` y `promote` solo se ejecutan si `validate` y `deploy-checks` pasan.
+`publish-images` y `promote` solo se ejecutan si `validate`, `deploy-checks` y `rtsp-integration` pasan.
+
+### Prueba con cámara RTSP simulada
+
+`rtsp-integration` ejecuta `apps/gateway/src/infrastructure/media/rtsp-camera.integration.test.ts` contra un servidor MediaMTX y un publicador FFmpeg que hace de cámara. Verifica que el gateway genera HLS reproducible (segmentos MPEG-TS), que se recupera solo cuando la cámara se apaga y vuelve, y (solo en Linux) que detecta una cámara congelada y reanuda al despertar. Para correrla en local necesitas FFmpeg en el `PATH` y MediaMTX escuchando en `rtsp://127.0.0.1:8554` (`RTSP_SERVER` cambia la dirección):
+
+```bash
+docker run -d --rm --name mediamtx --network host bluenviron/mediamtx:1.21.3
+RTSP_INTEGRATION=1 pnpm test:rtsp
+```
+
+Sin `RTSP_INTEGRATION=1` las pruebas se omiten, por lo que `pnpm test` sigue sin requerir FFmpeg.
 
 ### Seguridad y calidad
 

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { FfmpegStream, hasPlayableHlsOutput } from "./ffmpeg-stream.js";
+import { StreamManager } from "./stream-manager.js";
 
 test("HLS output is not ready until a playlist references a non-empty segment", () => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "camera-stream-health-"));
@@ -52,4 +53,76 @@ test("stream health becomes running only after the first referenced segment appe
   } finally {
     fs.rmSync(outputDir, { recursive: true, force: true });
   }
+});
+
+const HANGING_FFMPEG = `
+const fs = require("node:fs");
+const path = require("node:path");
+const playlist = process.argv[process.argv.length - 1];
+const dir = path.dirname(playlist);
+fs.writeFileSync(path.join(dir, "segment0.ts"), "media-segment");
+fs.writeFileSync(playlist, "#EXTM3U\\n#EXTINF:1,\\nsegment0.ts\\n");
+setInterval(() => {}, 1000);
+`;
+
+async function waitFor(condition: () => boolean, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error("Timed out waiting for condition");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+test("a hung ffmpeg that stops producing segments is killed and restarted", async () => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "camera-stream-stall-"));
+  const fakeScript = path.join(workDir, "fake-ffmpeg.cjs");
+  fs.writeFileSync(fakeScript, HANGING_FFMPEG);
+  const failures: string[] = [];
+  const stream = new FfmpegStream("camera-id", path.join(workDir, "out"), (failure) => {
+    failures.push(failure.error);
+  }, {
+    command: process.execPath,
+    commandArgs: [fakeScript],
+    stallTimeoutMs: 400,
+    watchdogIntervalMs: 100,
+  });
+  try {
+    stream.start("rtsp://camera.invalid/stream");
+    await waitFor(() => stream.refreshHealth().status === "running", 5000);
+    await waitFor(() => failures.length > 0, 5000);
+    assert.match(failures[0] ?? "", /stalled/i);
+    assert.ok(stream.health.restarts >= 1);
+  } finally {
+    stream.stop();
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("a process that never produces video is restarted after the startup timeout", async () => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "camera-stream-startup-"));
+  const fakeScript = path.join(workDir, "silent.cjs");
+  fs.writeFileSync(fakeScript, "setInterval(() => {}, 1000);");
+  const failures: string[] = [];
+  const stream = new FfmpegStream("camera-id", path.join(workDir, "out"), (failure) => {
+    failures.push(failure.error);
+  }, {
+    command: process.execPath,
+    commandArgs: [fakeScript],
+    startupTimeoutMs: 400,
+    watchdogIntervalMs: 100,
+  });
+  try {
+    stream.start("rtsp://camera.invalid/stream");
+    await waitFor(() => failures.length > 0, 5000);
+    assert.match(failures[0] ?? "", /did not produce video/i);
+  } finally {
+    stream.stop();
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("StreamManager rechaza ids que no son UUID (path traversal)", () => {
+  const manager = new StreamManager(os.tmpdir());
+  assert.throws(() => manager.get("../../etc"), /Invalid camera id/);
+  assert.doesNotThrow(() => manager.get("123e4567-e89b-12d3-a456-426614174000"));
 });

@@ -76,6 +76,39 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  rtsp-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Instalar FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Iniciar servidor RTSP simulado (MediaMTX)
+        run: |
+          docker run -d --name mediamtx --network host bluenviron/mediamtx:1.21.3
+          for _ in $(seq 1 20); do
+            (echo > /dev/tcp/127.0.0.1/8554) 2>/dev/null && exit 0
+            sleep 1
+          done
+          docker logs mediamtx
+          echo "::error::MediaMTX no abrió el puerto 8554."
+          exit 1
+      - name: Probar el gateway con una cámara RTSP simulada
+        env:
+          RTSP_INTEGRATION: "1"
+        run: pnpm test:rtsp
+      - name: Mostrar logs de MediaMTX si falla
+        if: failure()
+        run: docker logs mediamtx
+
   deploy-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -108,7 +141,7 @@ jobs:
 
   publish-images:
     if: github.event_name == 'push'
-    needs: [validate, deploy-checks]
+    needs: [validate, deploy-checks, rtsp-integration]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -156,7 +189,7 @@ jobs:
 
   promote:
     if: github.event_name == 'push' && (github.ref_name == 'develop' || github.ref_name == 'staging')
-    needs: [validate, deploy-checks]
+    needs: [validate, deploy-checks, rtsp-integration]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
