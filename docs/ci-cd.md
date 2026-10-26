@@ -55,6 +55,24 @@ echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u <usuario> --password-stdin
 
 Para volver a una versión anterior, repite el comando con `IMAGE_TAG=sha-<commit-anterior>`. Haz respaldo antes de cambiar de versión (ver [runbook](./operations-runbook.md)).
 
+### Versiones y Releases
+
+Una versión es una etiqueta `vX.Y.Z` sobre un commit de `master` (versionado semántico: `X` cambios incompatibles, `Y` funciones nuevas, `Z` correcciones). Cuando `master` ya pasó CI y publicó sus imágenes:
+
+```bash
+git switch master && git pull --ff-only
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+El workflow `release.yml`:
+
+1. Verifica que el commit pertenece a `master`.
+2. Etiqueta las imágenes ya probadas (`sha-<commit>`) también como `v1.0.0`, sin reconstruirlas.
+3. Crea la Release en GitHub con notas generadas desde los PR fusionados, agrupadas según `.github/release.yml` (usa las etiquetas `feature`, `bug`, `security`, `documentation`, etc.).
+
+Despliegue de una versión fija: `IMAGE_TAG=v1.0.0`. Si la etiqueta se empuja antes de que CI de `master` termine, el workflow falla con un aviso; vuelve a ejecutarlo cuando las imágenes existan.
+
 ## 4. Configuración requerida en GitHub
 
 No se puede aplicar desde el repositorio; hazlo en **Settings**:
