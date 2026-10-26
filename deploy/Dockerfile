@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 
 WORKDIR /workspace
 RUN corepack enable && corepack prepare pnpm@12.14.0 --activate
@@ -20,7 +20,7 @@ RUN pnpm exec tsc -b --clean packages/shared apps/gateway \
     && pnpm --filter @sistema-camaras/web build \
     && pnpm install --prod --offline --frozen-lockfile
 
-FROM node:24-bookworm-slim AS gateway
+FROM node:26-bookworm-slim AS gateway
 
 ENV NODE_ENV=production
 WORKDIR /workspace
