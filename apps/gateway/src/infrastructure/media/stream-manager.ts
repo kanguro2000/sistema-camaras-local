@@ -14,12 +14,22 @@ export class StreamManager {
     private readonly onFailure?: (failure: StreamFailure) => void,
   ) {}
 
+  private resolveCameraOutputDir(cameraId: string): string {
+    const rootDir = path.resolve(this.baseDir);
+    const candidateDir = path.resolve(rootDir, cameraId);
+    const rel = path.relative(rootDir, candidateDir);
+    if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
+      throw new Error("Invalid camera output path");
+    }
+    return candidateDir;
+  }
+
   get(cameraId: string): FfmpegStream {
     let s = this.streams.get(cameraId);
     if (!s) {
       // El id forma parte de una ruta en disco: solo se aceptan UUID para evitar path traversal.
       if (!CAMERA_ID_PATTERN.test(cameraId)) throw new Error("Invalid camera id");
-      s = new FfmpegStream(cameraId, path.join(this.baseDir, cameraId), this.onFailure);
+      s = new FfmpegStream(cameraId, this.resolveCameraOutputDir(cameraId), this.onFailure);
       this.streams.set(cameraId, s);
     }
     return s;
