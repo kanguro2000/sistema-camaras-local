@@ -1,0 +1,7 @@
+services:
+  gateway:
+    image: ghcr.io/${IMAGE_OWNER:-kanguro2000}/sistema-camaras-gateway:${IMAGE_TAG:-latest}
+    pull_policy: always
+  web:
+    image: ghcr.io/${IMAGE_OWNER:-kanguro2000}/sistema-camaras-web:${IMAGE_TAG:-latest}
+    pull_policy: always
