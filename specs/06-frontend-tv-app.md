@@ -17,6 +17,7 @@
 - El foco se mueve según la posición visual del control más cercano; no salta en ciclo al llegar al borde de una vista.
 - Las cámaras deshabilitadas no reciben foco. Al volver desde administración o pantalla completa, se recupera el foco de la cámara seleccionada.
 - Atrás/Escape en el grid no cierra sesión; cerrar sesión requiere activar su botón. Al cerrar formularios, el foco regresa al control que los abrió.
+- El diálogo de eliminación contiene la navegación del mando y Tab; al cancelarlo, devuelve el foco al botón que lo abrió.
 - Las flechas conservan su comportamiento nativo en campos de texto y controles de selección.
 - Teclas de color (si existen): atajos (rojo = grid, verde = fullscreen, etc.) opcional.
 - Foco visible con anillo de alto contraste.
