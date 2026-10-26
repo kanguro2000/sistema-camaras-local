@@ -9,7 +9,7 @@
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint && eslint playwright.config.ts e2e",
-    "typecheck": "pnpm -r typecheck && pnpm exec tsc -p tsconfig.e2e.json --noEmit",
+    "typecheck": "pnpm --filter @sistema-camaras/shared build && pnpm -r typecheck && pnpm exec tsc -p tsconfig.e2e.json --noEmit",
     "test": "pnpm -r test && pnpm test:e2e",
     "test:e2e": "playwright test",
     "secrets": "node scripts/generate-secrets.mjs"
