@@ -2,12 +2,14 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
     commit-message:
       prefix: "chore"
   - package-ecosystem: npm
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -23,7 +25,11 @@ updates:
         update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /deploy
+    target-branch: develop
     schedule:
       interval: weekly
     commit-message:
       prefix: "chore"
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
