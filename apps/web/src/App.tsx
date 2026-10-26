@@ -44,6 +44,10 @@ export default function App({ service, store }: { service: AppService; store: Ap
   const [streamStates, setStreamStates] = useState<Record<string, CameraStreamState>>({});
   const [fullId, setFullId] = useState<string | null>(null);
   const [fullSrc, setFullSrc] = useState<string | null>(null);
+  const [fullPlaybackStatus, setFullPlaybackStatus] = useState<CameraPlaybackStatus>("loading");
+  const [fullRetryKey, setFullRetryKey] = useState(0);
+  const [fullRetrying, setFullRetrying] = useState(false);
+  const fullRetryButton = useRef<HTMLButtonElement>(null);
   const restoreGridFocus = useRef(false);
   const lastGridFocus = useRef<HTMLElement | null>(null);
   const pageCount = Math.max(1, Math.ceil(cameras.length / CAMERAS_PER_PAGE));
@@ -63,11 +67,28 @@ export default function App({ service, store }: { service: AppService; store: Ap
       const stream = await service.openStream(cameraId);
       setFullId(cameraId);
       setFullSrc(stream.hlsUrl);
+      setFullPlaybackStatus("loading");
+      setFullRetryKey(0);
       setView("fullscreen");
     } catch (err) {
       setError(String(err));
     }
   }, [service]);
+
+  const retryFullscreen = useCallback(async () => {
+    if (!fullId || fullRetrying) return;
+    setFullRetrying(true);
+    try {
+      const stream = await service.openStream(fullId);
+      setFullSrc(stream.hlsUrl);
+      setFullRetryKey((current) => current + 1);
+    } catch (err) {
+      setFullPlaybackStatus("error");
+      setError(String(err));
+    } finally {
+      setFullRetrying(false);
+    }
+  }, [fullId, fullRetrying, service]);
 
   const retryStream = useCallback(async (cameraId: string) => {
     setStreamStates((current) => ({
@@ -222,11 +243,18 @@ export default function App({ service, store }: { service: AppService; store: Ap
         setView("grid");
         setFullId(null);
         setFullSrc(null);
+        setFullPlaybackStatus("loading");
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [view]);
+
+  useEffect(() => {
+    if (view === "fullscreen" && fullPlaybackStatus === "error") {
+      fullRetryButton.current?.focus();
+    }
+  }, [fullPlaybackStatus, view]);
 
   useEffect(() => {
     if (view !== "fullscreen" || !fullId) return;
@@ -276,7 +304,27 @@ export default function App({ service, store }: { service: AppService; store: Ap
     const cam = cameras.find((c) => c.id === fullId);
     return (
       <div className="fullscreen">
-        <HlsPlayer src={fullSrc} className="video-full" />
+        <HlsPlayer
+          key={fullRetryKey}
+          src={fullSrc}
+          className="video-full"
+          onPlaybackStatusChange={setFullPlaybackStatus}
+        />
+        {(fullPlaybackStatus === "error" || fullRetrying) && (
+          <div className="fullscreen-recovery" role="alert">
+            <p>{fullRetrying
+              ? "Reintentando reproducción…"
+              : `No se pudo reproducir el video de ${cam?.name ?? "la cámara"}.`}</p>
+            <button
+              ref={fullRetryButton}
+              type="button"
+              onClick={() => void retryFullscreen()}
+              disabled={fullRetrying}
+            >
+              {fullRetrying ? "Reintentando…" : "Reintentar video"}
+            </button>
+          </div>
+        )}
         <div className="overlay">
           <span>{cam?.name}</span>
           <span>Atrás: volver</span>

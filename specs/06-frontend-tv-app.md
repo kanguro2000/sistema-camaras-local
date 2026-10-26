@@ -27,7 +27,7 @@
 - Usar hls.js con config de baja latencia: `liveSyncDuration: 1`, `liveMaxLatencyDuration: 3`.
 - Fallback a `<video>` nativo si hls.js no soportado.
 - Autoplay muted por defecto (política de TV); botón para activar audio.
-- Manejo de errores: mostrar estado y botón "Reintentar".
+- Manejo de errores: mostrar estado visible y botón "Reintentar" tanto en tiles como en pantalla completa; los errores de reproducción de HLS y del fallback nativo deben ser recuperables.
 
 ## 4. Estado
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 export default function HlsPlayer({ src, className, onPlaybackStatusChange }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const statusCallbackRef = useRef(onPlaybackStatusChange);
+  const [status, setStatus] = useState<"loading" | "playing" | "error">("loading");
 
   useEffect(() => {
     statusCallbackRef.current = onPlaybackStatusChange;
@@ -20,6 +21,7 @@ export default function HlsPlayer({ src, className, onPlaybackStatusChange }: Pr
     if (!video) return;
     let hls: Hls | null = null;
     const reportStatus = (status: "loading" | "playing" | "error") => {
+      setStatus(status);
       statusCallbackRef.current?.(status);
     };
     reportStatus("loading");
@@ -63,5 +65,12 @@ export default function HlsPlayer({ src, className, onPlaybackStatusChange }: Pr
     };
   }, [src]);
 
-  return <video ref={videoRef} className={className} muted playsInline controls={false} />;
+  return (
+    <>
+      <video ref={videoRef} className={className} muted playsInline controls={false} />
+      {status === "error" && (
+        <span className="player-error" role="alert">No se pudo reproducir el video.</span>
+      )}
+    </>
+  );
 }

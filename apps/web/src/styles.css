@@ -55,6 +55,19 @@ h1 {
   object-fit: contain;
   background: #000;
 }
+.player-error {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffb0b0;
+  text-align: center;
+  pointer-events: none;
+}
 .error {
   color: #ff6b6b;
 }
@@ -336,6 +349,40 @@ header { margin-bottom: 16px; }
 }
 .fullscreen { position: relative; width: 100vw; height: 100vh; background: #000; }
 .video-full { width: 100%; height: 100%; object-fit: contain; }
+.fullscreen-recovery {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(90vw, 560px);
+  padding: 24px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #754343;
+  border-radius: 12px;
+  background: rgba(11, 15, 20, 0.94);
+  text-align: center;
+}
+.fullscreen-recovery p {
+  margin: 0;
+  color: #ffb0b0;
+  font-size: 20px;
+}
+.fullscreen-recovery button {
+  border: 1px solid #455264;
+  border-radius: 8px;
+  padding: 12px 18px;
+  background: #1c2735;
+  color: #e6e9ef;
+  font: inherit;
+}
+.fullscreen-recovery button:focus-visible {
+  outline: 3px solid #4f8cff;
+  outline-offset: 2px;
+}
 .overlay {
   position: absolute;
   bottom: 16px;
