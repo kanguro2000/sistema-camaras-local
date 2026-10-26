@@ -9,30 +9,21 @@
 - Red: Ethernet recomendado, misma LAN que cámaras.
 - Node.js 24 en las imágenes de contenedor; no se instala Node.js en el host Ubuntu.
 
-## 2. Docker Compose (referencia)
+## 2. Docker Compose
 
-```yaml
-services:
-  gateway:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-      target: gateway
-    expose: ["8080"]
-    volumes: ["../data:/workspace/apps/gateway/data"]
-    env_file: ../.env
-    restart: unless-stopped
-  web:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-      target: web
-    ports: ["8080:8080"]
-    depends_on: [gateway]
-    restart: unless-stopped
+La configuración mantenida está en `deploy/docker-compose.yml`; el Dockerfile
+multi-stage está en `deploy/Dockerfile`. Desde la raíz del repositorio:
+
+```bash
+sudo docker compose -f deploy/docker-compose.yml up -d --build
+sudo docker compose -f deploy/docker-compose.yml ps
+curl --fail --silent --show-error http://localhost:8080/api/health
 ```
 
-Solo el frontend/proxy publica el puerto `8080` en la LAN. El gateway queda en la red privada de Compose. No se exponen RTSP, HLS interno ni una API de MediaMTX.
+Solo Nginx publica el puerto `8080` en la LAN. El gateway queda en la red
+privada de Compose; no se exponen RTSP, HLS interno ni la API de MediaMTX. El
+`.env` está en la raíz del repositorio y Compose monta `data/` del host en
+`/workspace/apps/gateway/data` dentro del gateway.
 
 ## 3. Variables de entorno
 
@@ -41,8 +32,13 @@ Solo el frontend/proxy publica el puerto `8080` en la LAN. El gateway queda en l
 
 ## 4. Backups
 
-- Backup de SQLite (`data/*.db`) programado (cron) a carpeta local.
-- Restauración documentada.
+- Respaldar `data/app.db` con el gateway detenido para obtener una copia
+  consistente de SQLite.
+- Conservar una copia segura del `.env`, especialmente el mismo `MASTER_KEY`
+  necesario para descifrar credenciales de cámara.
+- Restaurar primero con los servicios detenidos; iniciar de nuevo para aplicar
+  migraciones si corresponden.
+- Comandos paso a paso en [`docs/operations-runbook.md`](../docs/operations-runbook.md).
 
 ## 5. Monitoreo
 
@@ -51,6 +47,9 @@ Solo el frontend/proxy publica el puerto `8080` en la LAN. El gateway queda en l
 - Los fallos de probe RTSP, FFmpeg y generación de playlist se registran sin credenciales.
 - `bash deploy/collect-diagnostics.sh [duración]` crea un informe local sanitizado con estado de servicios, health y logs recientes; no adjunta `.env` ni la base de datos.
 - (Opcional) Prometheus metrics.
+
+Para comandos de inicio, reinicio, actualización y solución de problemas,
+consultar [`docs/operations-runbook.md`](../docs/operations-runbook.md).
 
 ## 6. Actualizaciones
 

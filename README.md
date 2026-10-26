@@ -8,6 +8,7 @@ Visualización en vivo de cámaras TP-Link Tapo en TVs Hisense (Vidaa) y TCL (An
 - `MEMORY.md` — memoria y decisiones (ADR).
 - `AGENTS.md` — guía para agentes de código.
 - `specs/` — especificaciones técnicas.
+- [`docs/operations-runbook.md`](docs/operations-runbook.md) — comandos de operación, respaldos y solución de problemas.
 - `skills/` — skills para agentes.
 
 ## Inicio rápido (desarrollo)
@@ -46,6 +47,9 @@ El script instala Docker/Compose sin agregar el usuario al grupo `docker`, crea 
 Se requiere conectividad a Internet durante la primera construcción de las imágenes. No configures reenvío del puerto 8080 desde el router a Internet. Ver `deploy/TESTING.md` para la checklist posterior.
 
 Despliegue manual: ver `specs/10-deployment-ops.md`.
+
+Para comandos de operación cotidiana, reinicios, actualización, respaldo y
+solución de problemas, consulta el [runbook técnico](docs/operations-runbook.md).
 
 ## Diagnóstico de errores
 
