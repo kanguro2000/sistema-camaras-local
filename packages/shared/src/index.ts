@@ -86,3 +86,12 @@ export const HealthSchema = z.object({
   lastFrameAt: z.string().datetime().optional(),
 });
 export type Health = z.infer<typeof HealthSchema>;
+
+export const CameraStreamHealthSchema = z.object({
+  status: z.enum(["starting", "running", "stopped", "error"]),
+  pid: z.number().int().positive().optional(),
+  restarts: z.number().int().nonnegative(),
+  lastError: z.string().optional(),
+  startedAt: z.string().datetime().optional(),
+});
+export type CameraStreamHealth = z.infer<typeof CameraStreamHealthSchema>;

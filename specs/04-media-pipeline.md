@@ -41,6 +41,7 @@ El despliegue actual no usa MediaMTX y no transcodifica H.265 a H.264; esos esce
 - Backoff exponencial: 1 s, 2 s, 4 s, 8 s, 16 s, max 30 s.
 - Tras reconexión exitosa, reset backoff.
 - Estado reportado en health endpoint y UI.
+- El estado `running` se confirma cuando FFmpeg ha generado la playlist HLS y al menos un segmento; el proceso iniciado sin salida multimedia permanece `starting`.
 
 ## 6. Codecs y compatibilidad TV
 

@@ -35,6 +35,17 @@ export class FfmpegStream {
     return path.join(this.outputDir, "index.m3u8");
   }
 
+  refreshHealth() {
+    if (this.proc && this.health.status === "starting") {
+      const hasPlaylist = fs.existsSync(this.hlsPath);
+      const hasSegment = fs.readdirSync(this.outputDir).some((file) => file.endsWith(".ts"));
+      if (hasPlaylist && hasSegment) {
+        this.health = { ...this.health, status: "running", lastError: undefined };
+      }
+    }
+    return this.health;
+  }
+
   start(rtspUrl?: string) {
     if (this.proc) return;
     this.stopping = false;
@@ -77,9 +88,6 @@ export class FfmpegStream {
       this.proc = null;
       this.reportFailure(`Failed to spawn ffmpeg: ${err.message}`);
       this.scheduleRestart();
-    });
-    this.proc.stdout?.on("data", () => {
-      if (this.health.status === "starting") this.health.status = "running";
     });
     this.proc.stderr?.on("data", (d: Buffer) => {
       const msg = d.toString().trim();

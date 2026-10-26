@@ -4,6 +4,7 @@ import {
   CameraCreateSchema,
   CameraProbeResultSchema,
   CameraSchema,
+  CameraStreamHealthSchema,
   LoginSchema,
 } from "../src/index.js";
 
@@ -44,4 +45,13 @@ test("camera probe contract validates success and failure results", () => {
   );
   assert.equal(CameraProbeResultSchema.safeParse({ ok: false, error: "Connection timed out" }).success, true);
   assert.equal(CameraProbeResultSchema.safeParse({ ok: "yes" }).success, false);
+});
+
+test("camera stream health contract reports runtime states", () => {
+  assert.equal(CameraStreamHealthSchema.safeParse({ status: "running", restarts: 0 }).success, true);
+  assert.equal(
+    CameraStreamHealthSchema.safeParse({ status: "error", restarts: 2, lastError: "FFmpeg failed" }).success,
+    true,
+  );
+  assert.equal(CameraStreamHealthSchema.safeParse({ status: "online", restarts: 0 }).success, false);
 });

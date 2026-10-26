@@ -36,6 +36,10 @@ export class AppService {
     return this.gateway.openStream(cameraId);
   }
 
+  cameraStreamHealth(cameraId: string) {
+    return this.gateway.cameraStreamHealth(cameraId);
+  }
+
   refreshStreamTicket(cameraId: string) {
     return this.gateway.refreshStreamTicket(cameraId);
   }

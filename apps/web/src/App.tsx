@@ -1,11 +1,36 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type { CameraStreamHealth } from "@sistema-camaras/shared";
 import { AppService } from "./application/services/app-service.js";
 import { AppStore } from "./store.js";
 import HlsPlayer from "./components/HlsPlayer.js";
-import CameraTile from "./components/CameraTile.js";
+import CameraTile, { type CameraPlaybackStatus } from "./components/CameraTile.js";
 import CameraManagement from "./components/CameraManagement.js";
 
 type View = "login" | "grid" | "fullscreen" | "manage";
+type CameraStreamState = {
+  hlsUrl?: string;
+  health?: CameraStreamHealth;
+  playbackStatus?: CameraPlaybackStatus;
+  requestFailed?: boolean;
+};
+
+const CAMERAS_PER_PAGE = 4;
+const HEALTH_POLL_INTERVAL_MS = 10_000;
+
+function streamStatusLabel(
+  enabled: boolean,
+  streamState: CameraStreamState | undefined,
+): string {
+  if (!enabled) return "Deshabilitada";
+  if (streamState?.requestFailed || streamState?.health?.status === "error") return "Error";
+  if (streamState?.health?.status === "stopped") return "Detenida";
+  if (streamState?.health?.status === "running") {
+    if (streamState.playbackStatus === "playing") return "En vivo";
+    if (streamState.playbackStatus === "error") return "Error de reproducción";
+    return "Cargando video";
+  }
+  return "Conectando";
+}
 
 export default function App({ service, store }: { service: AppService; store: AppStore }) {
   const { token, user, setAuth, setUser, logout, cameras, setCameras } = store();
@@ -14,8 +39,16 @@ export default function App({ service, store }: { service: AppService; store: Ap
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
+  const [page, setPage] = useState(0);
+  const [streamStates, setStreamStates] = useState<Record<string, CameraStreamState>>({});
   const [fullId, setFullId] = useState<string | null>(null);
   const [fullSrc, setFullSrc] = useState<string | null>(null);
+  const pageCount = Math.max(1, Math.ceil(cameras.length / CAMERAS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visibleCameras = useMemo(
+    () => cameras.slice(currentPage * CAMERAS_PER_PAGE, (currentPage + 1) * CAMERAS_PER_PAGE),
+    [cameras, currentPage],
+  );
 
   const refreshCameras = useCallback(async () => {
     setCameras(await service.listCameras());
@@ -30,6 +63,31 @@ export default function App({ service, store }: { service: AppService; store: Ap
       setView("fullscreen");
     } catch (err) {
       setError(String(err));
+    }
+  }, [service]);
+
+  const retryStream = useCallback(async (cameraId: string) => {
+    setStreamStates((current) => ({
+      ...current,
+      [cameraId]: {
+        ...current[cameraId],
+        hlsUrl: undefined,
+        health: { status: "starting", restarts: 0 },
+        playbackStatus: "loading",
+        requestFailed: false,
+      },
+    }));
+    try {
+      const stream = await service.openStream(cameraId);
+      setStreamStates((current) => ({
+        ...current,
+        [cameraId]: { ...current[cameraId], hlsUrl: stream.hlsUrl, health: stream.health },
+      }));
+    } catch {
+      setStreamStates((current) => ({
+        ...current,
+        [cameraId]: { ...current[cameraId], requestFailed: true },
+      }));
     }
   }, [service]);
 
@@ -56,6 +114,61 @@ export default function App({ service, store }: { service: AppService; store: Ap
     refreshCameras()
       .catch((e) => setError(String(e)));
   }, [refreshCameras, token]);
+
+  useEffect(() => {
+    if (view !== "grid" || !token) return;
+    let active = true;
+    const cameraIds = visibleCameras
+      .filter((camera) => camera.enabled)
+      .map((camera) => camera.id);
+
+    const updateCameraState = (cameraId: string, update: CameraStreamState) => {
+      if (!active) return;
+      setStreamStates((current) => ({
+        ...current,
+        [cameraId]: { ...current[cameraId], ...update },
+      }));
+    };
+
+    const startVisibleStreams = async () => {
+      await Promise.all(visibleCameras.map(async (camera) => {
+        if (!camera.enabled) {
+          updateCameraState(camera.id, { health: { status: "stopped", restarts: 0 } });
+          return;
+        }
+        updateCameraState(camera.id, {
+          hlsUrl: undefined,
+          health: { status: "starting", restarts: 0 },
+          playbackStatus: "loading",
+          requestFailed: false,
+        });
+        try {
+          const stream = await service.openStream(camera.id);
+          updateCameraState(camera.id, { hlsUrl: stream.hlsUrl, health: stream.health });
+        } catch {
+          updateCameraState(camera.id, { requestFailed: true });
+        }
+      }));
+    };
+
+    const refreshVisibleHealth = () => {
+      void Promise.all(cameraIds.map(async (cameraId) => {
+        try {
+          const health = await service.cameraStreamHealth(cameraId);
+          updateCameraState(cameraId, { health, requestFailed: false });
+        } catch {
+          updateCameraState(cameraId, { requestFailed: true });
+        }
+      }));
+    };
+
+    void startVisibleStreams();
+    const timer = window.setInterval(refreshVisibleHealth, HEALTH_POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [service, token, view, visibleCameras]);
 
   useEffect(() => {
     if (view !== "grid") return;
@@ -150,7 +263,7 @@ export default function App({ service, store }: { service: AppService; store: Ap
         <HlsPlayer src={fullSrc} className="video-full" />
         <div className="overlay">
           <span>{cam?.name}</span>
-          <span>Back: volver</span>
+          <span>Atrás: volver</span>
         </div>
       </div>
     );
@@ -179,18 +292,37 @@ export default function App({ service, store }: { service: AppService; store: Ap
         </nav>
       </header>
       <div className="grid">
-        {cameras.map((c, i) => (
+        {visibleCameras.map((c, i) => {
+          const cameraIndex = currentPage * CAMERAS_PER_PAGE + i;
+          const streamState = streamStates[c.id];
+          const status = streamStatusLabel(c.enabled, streamState);
+          return (
           <CameraTile
             key={c.id}
-            index={i}
+            index={cameraIndex}
             name={c.name}
-            selected={i === selected}
+            enabled={c.enabled}
+            src={streamState?.hlsUrl}
+            status={status}
+            selected={cameraIndex === selected}
+            onRetry={c.enabled && (
+              streamState?.requestFailed
+              || streamState?.health?.status === "error"
+              || streamState?.playbackStatus === "error"
+            ) ? () => { void retryStream(c.id); } : undefined}
+            onPlaybackStatusChange={(playbackStatus) => {
+              setStreamStates((current) => ({
+                ...current,
+                [c.id]: { ...current[c.id], playbackStatus },
+              }));
+            }}
             onSelect={() => {
-              setSelected(i);
-              void openCamera(c.id);
+              setSelected(cameraIndex);
+              if (c.enabled) void openCamera(c.id);
             }}
           />
-        ))}
+          );
+        })}
         {cameras.length === 0 && (
           <div className="empty-cameras">
             <p>No hay cámaras registradas.</p>
@@ -202,8 +334,39 @@ export default function App({ service, store }: { service: AppService; store: Ap
           </div>
         )}
       </div>
+      {pageCount > 1 && (
+        <nav className="camera-pagination" aria-label="Páginas de cámaras">
+          <button
+            type="button"
+            onClick={() => {
+              const nextPage = Math.max(0, currentPage - 1);
+              setPage(nextPage);
+              setSelected(nextPage * CAMERAS_PER_PAGE);
+            }}
+            disabled={currentPage === 0}
+          >
+            Página anterior
+          </button>
+          <span>
+            Cámaras{" "}
+            {currentPage * CAMERAS_PER_PAGE + 1}–{Math.min((currentPage + 1) * CAMERAS_PER_PAGE, cameras.length)}
+            {" "}de {cameras.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const nextPage = Math.min(pageCount - 1, currentPage + 1);
+              setPage(nextPage);
+              setSelected(nextPage * CAMERAS_PER_PAGE);
+            }}
+            disabled={currentPage === pageCount - 1}
+          >
+            Página siguiente
+          </button>
+        </nav>
+      )}
       {error && <p className="error">{error}</p>}
-      <footer className="hint">Flechas: navegar · Enter: abrir · Esc: salir</footer>
+      <footer className="hint">Flechas: navegar · Enter: abrir · Selecciona una cámara para verla en pantalla completa</footer>
     </div>
   );
 }

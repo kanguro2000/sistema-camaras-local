@@ -2,7 +2,7 @@
 
 ## 1. Vistas
 
-- **Home / Grid**: grid de cámaras (1, 2x2, 3x3, 4x4). Cada tile muestra video + nombre + estado.
+- **Home / Grid**: videowall de hasta cuatro cámaras en vivo (2x2); si hay más, se navega por páginas de cuatro. Cada tile muestra video HLS + nombre + estado real del stream.
 - **Fullscreen**: una cámara a pantalla completa con overlay de controles.
 - **Administrar cámaras** (admin): agregar, editar, eliminar y probar conexión RTSP de cámaras.
 - El acceso a administración aparece en la vista principal al iniciar sesión como admin; no existe una vista separada del gateway.
@@ -34,6 +34,9 @@
 ## 5. Rendimiento en TV
 
 - Limitar streams simultáneos visibles (max 4 en grid 2x2 para CPU de TV).
+- El estado del tile distingue cámara deshabilitada, stream conectando, video en carga, en vivo, detenido y error de stream/reproducción; no indicar "en vivo" hasta que el video emita `playing`.
+- Consultar `/api/cameras/:id/health` cada 10 s solo para la página visible.
+- Al cambiar de página se desmontan los reproductores anteriores; el gateway detiene sus procesos al vencer el período de inactividad de 30 s sin solicitudes de segmentos.
 - Lazy load de tiles fuera de viewport.
 - Evitar animaciones pesadas.
 - Bundle target ES2019, sin polyfills innecesarios.

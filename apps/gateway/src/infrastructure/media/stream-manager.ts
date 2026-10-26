@@ -58,6 +58,6 @@ export class StreamManager {
 
   health(cameraId: string): CameraStreamHealth {
     const s = this.streams.get(cameraId);
-    return s ? s.health : { status: "stopped", restarts: 0 };
+    return s ? s.refreshHealth() : { status: "stopped", restarts: 0 };
   }
 }

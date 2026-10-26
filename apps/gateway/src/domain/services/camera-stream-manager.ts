@@ -1,10 +1,6 @@
-export interface CameraStreamHealth {
-  status: "starting" | "running" | "stopped" | "error";
-  pid?: number;
-  restarts: number;
-  lastError?: string;
-  startedAt?: string;
-}
+import type { CameraStreamHealth } from "@sistema-camaras/shared";
+
+export type { CameraStreamHealth } from "@sistema-camaras/shared";
 
 export interface CameraStreamManager {
   ensureRunning(cameraId: string, rtspUrl: string): Promise<void>;
