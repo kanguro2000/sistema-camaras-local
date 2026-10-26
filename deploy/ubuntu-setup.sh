@@ -35,9 +35,23 @@ fi
 cd "$REPO_DIR"
 
 echo "==> Configurando .env"
-if [ ! -f .env ]; then
-  bash "$SCRIPT_DIR/generate-secrets.sh" "$REPO_DIR/.env"
-  echo "==> .env creado; la contraseña inicial se guardó en ese archivo y no se mostró."
+ENV_FILE="$REPO_DIR/.env"
+if [ ! -e "$ENV_FILE" ]; then
+  bash "$SCRIPT_DIR/generate-secrets.sh" "$ENV_FILE"
+  echo "==> .env creado en $ENV_FILE; la contraseña inicial se guardó en ese archivo y no se mostró."
+elif [ ! -f "$ENV_FILE" ]; then
+  echo "$ENV_FILE existe pero no es un archivo regular. Muévelo o elimínalo y vuelve a ejecutar." >&2
+  exit 1
+else
+  echo "==> .env existente conservado en $ENV_FILE (no se sobrescribe ni se regenera)."
+  for key in JWT_SECRET MASTER_KEY; do
+    if ! grep -Eq "^${key}=.+" "$ENV_FILE"; then
+      echo "Falta ${key} o está vacío en $ENV_FILE." >&2
+      echo "Respalda el archivo, corrígelo o elimínalo para generar uno nuevo, y vuelve a ejecutar." >&2
+      echo "Atención: cambiar MASTER_KEY impide descifrar credenciales de cámaras ya guardadas." >&2
+      exit 1
+    fi
+  done
 fi
 
 echo "==> Preparando almacenamiento"
