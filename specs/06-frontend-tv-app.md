@@ -14,6 +14,9 @@
 - OK/Enter: seleccionar/abrir.
 - Back/Escape: volver.
 - En la vista principal, los controles de administración y las cámaras se pueden recorrer con el D-pad; Enter/OK activa el control enfocado.
+- El foco se mueve según la posición visual del control más cercano; no salta en ciclo al llegar al borde de una vista.
+- Las cámaras deshabilitadas no reciben foco. Al volver desde administración o pantalla completa, se recupera el foco de la cámara seleccionada.
+- Las flechas conservan su comportamiento nativo en campos de texto y controles de selección.
 - Teclas de color (si existen): atajos (rojo = grid, verde = fullscreen, etc.) opcional.
 - Foco visible con anillo de alto contraste.
 - Sin dependencia de mouse.

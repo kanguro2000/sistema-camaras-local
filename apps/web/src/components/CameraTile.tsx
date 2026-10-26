@@ -43,6 +43,7 @@ export default function CameraTile({
         onClick={onSelect}
         data-camera-index={index}
         tabIndex={0}
+        disabled={!enabled}
         aria-disabled={!enabled}
         aria-label={enabled
           ? `${name}: ${status}. Abrir a pantalla completa.`

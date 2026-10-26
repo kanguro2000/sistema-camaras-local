@@ -5,6 +5,7 @@ import { AppStore } from "./store.js";
 import HlsPlayer from "./components/HlsPlayer.js";
 import CameraTile, { type CameraPlaybackStatus } from "./components/CameraTile.js";
 import CameraManagement from "./components/CameraManagement.js";
+import { getSpatialDirection, isRemoteBackKey, navigateSpatially } from "./lib/spatial-navigation.js";
 
 type View = "login" | "grid" | "fullscreen" | "manage";
 type CameraStreamState = {
@@ -171,38 +172,45 @@ export default function App({ service, store }: { service: AppService; store: Ap
   }, [service, token, view, visibleCameras]);
 
   useEffect(() => {
+    if (view !== "grid" || !user) return;
+    const container = document.querySelector<HTMLElement>(".grid-view");
+    if (!container) return;
+    const selectedCamera = container.querySelector<HTMLButtonElement>(
+      `[data-camera-index="${selected}"]:not(:disabled)`,
+    );
+    const firstCamera = container.querySelector<HTMLButtonElement>(".tile:not(:disabled)");
+    const target = selectedCamera ?? firstCamera
+      ?? container.querySelector<HTMLButtonElement>(".empty-cameras button");
+    target?.focus();
+  }, [cameras, page, selected, user, view]);
+
+  useEffect(() => {
     if (view !== "grid") return;
     const handler = (event: KeyboardEvent) => {
-      if (event.key.startsWith("Arrow")) {
-        const controls = Array.from(document.querySelectorAll<HTMLButtonElement>(".grid-view button"));
-        if (controls.length === 0) return;
-        const currentIndex = controls.findIndex((control) => control === document.activeElement);
-        const direction = event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 1;
-        const nextIndex = currentIndex < 0
-          ? (direction > 0 ? 0 : controls.length - 1)
-          : (currentIndex + direction + controls.length) % controls.length;
+      const direction = getSpatialDirection(event);
+      if (direction) {
+        const container = document.querySelector<HTMLElement>(".grid-view");
+        if (container && navigateSpatially(container, direction)) event.preventDefault();
+        const focusedCamera = document.activeElement instanceof HTMLElement
+          ? document.activeElement.closest<HTMLButtonElement>("[data-camera-index]")
+          : null;
+        if (focusedCamera) {
+          const cameraIndex = Number(focusedCamera.dataset.cameraIndex);
+          if (Number.isInteger(cameraIndex)) setSelected(cameraIndex);
+        }
+      } else if (isRemoteBackKey(event)) {
         event.preventDefault();
-        const nextControl = controls[nextIndex];
-        nextControl?.focus();
-        const cameraIndex = Number(nextControl?.dataset.cameraIndex);
-        if (Number.isInteger(cameraIndex) && cameraIndex >= 0) setSelected(cameraIndex);
-      } else if (event.key === "Enter") {
-        const activeControl = document.activeElement?.closest(".grid-view button");
-        if (activeControl) return;
-        if (cameras[selected]) void openCamera(cameras[selected].id);
-      } else if (event.key === "Escape" || event.key === "Backspace") {
-        logout();
-        setView("login");
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [view, cameras, selected, openCamera, logout]);
+  }, [view]);
 
   useEffect(() => {
     if (view !== "fullscreen") return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Backspace") {
+      if (isRemoteBackKey(e)) {
+        e.preventDefault();
         setView("grid");
         setFullId(null);
         setFullSrc(null);

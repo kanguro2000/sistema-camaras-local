@@ -1,7 +1,8 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import type { CameraProbeResult } from "@sistema-camaras/shared";
 import type { AppService } from "../application/services/app-service.js";
 import type { Camera, CameraCreateInput, CameraUpdateInput } from "../domain/entities/camera.js";
+import { getSpatialDirection, isRemoteBackKey, navigateSpatially } from "../lib/spatial-navigation.js";
 
 interface CameraManagementProps {
   cameras: Camera[];
@@ -55,34 +56,41 @@ export default function CameraManagement({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const formReturnFocus = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      const typing = event.target instanceof HTMLInputElement && event.target.type !== "checkbox";
-      if (event.key === "Escape" || (event.key === "Backspace" && !typing)) {
+      const target = event.target;
+      const typing = (target instanceof HTMLInputElement
+        && !["checkbox", "radio", "button", "submit", "reset"].includes(target.type))
+        || target instanceof HTMLTextAreaElement
+        || (target instanceof HTMLElement && target.isContentEditable);
+      if (isRemoteBackKey(event) && (event.key !== "Backspace" || !typing)) {
         event.preventDefault();
         if (pendingDelete) setPendingDelete(null);
         else if (formOpen) setFormOpen(false);
         else onBack();
         return;
       }
-      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-      const controls = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          ".camera-management button:not(:disabled), .camera-management input:not(:disabled)",
-        ),
-      );
-      const currentIndex = controls.findIndex((control) => control === document.activeElement);
-      if (currentIndex < 0 || controls.length === 0) return;
-      event.preventDefault();
-      const offset = event.key === "ArrowDown" ? 1 : -1;
-      controls[(currentIndex + offset + controls.length) % controls.length]?.focus();
+      const direction = getSpatialDirection(event);
+      if (!direction) return;
+      const container = document.querySelector<HTMLElement>(".camera-management");
+      if (container && navigateSpatially(container, direction)) event.preventDefault();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [formOpen, onBack, pendingDelete]);
 
+  useEffect(() => {
+    if (formOpen) return;
+    if (formReturnFocus.current?.isConnected) formReturnFocus.current.focus();
+    formReturnFocus.current = null;
+  }, [formOpen]);
+
   const openCreateForm = () => {
+    formReturnFocus.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     setEditingId(null);
     setForm(EMPTY_FORM);
     setFormOpen(true);
@@ -91,6 +99,9 @@ export default function CameraManagement({
   };
 
   const openEditForm = (camera: Camera) => {
+    formReturnFocus.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     setEditingId(camera.id);
     setForm({
       name: camera.name,
