@@ -50,11 +50,52 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm -r test
       - run: pnpm build
+      - name: Auditar dependencias de producción
+        run: pnpm audit --prod --audit-level=high
+      - name: Medir cobertura de pruebas unitarias
+        run: |
+          {
+            echo "## Cobertura de pruebas unitarias"
+            echo '```'
+            pnpm test:coverage 2>&1 | grep -E "test:coverage: ℹ (all files|file )|^(packages|apps)/.*all files" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Corre en paralelo con validate: la descarga de Chromium es lo más lento del pipeline.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Versión de Playwright
+        id: pw
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Caché de navegadores de Playwright
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Instalar Chromium y dependencias del sistema
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Instalar solo dependencias del sistema (navegador en caché)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+      - run: pnpm --filter @sistema-camaras/shared build
+      - run: pnpm test:e2e
       - name: Subir reportes de Playwright
         if: failure()
         uses: actions/upload-artifact@v7
@@ -65,6 +106,39 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  rtsp-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Instalar FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Iniciar servidor RTSP simulado (MediaMTX)
+        run: |
+          docker run -d --name mediamtx --network host bluenviron/mediamtx:1.21.3
+          for _ in $(seq 1 20); do
+            (echo > /dev/tcp/127.0.0.1/8554) 2>/dev/null && exit 0
+            sleep 1
+          done
+          docker logs mediamtx
+          echo "::error::MediaMTX no abrió el puerto 8554."
+          exit 1
+      - name: Probar el gateway con una cámara RTSP simulada
+        env:
+          RTSP_INTEGRATION: "1"
+        run: pnpm test:rtsp
+      - name: Mostrar logs de MediaMTX si falla
+        if: failure()
+        run: docker logs mediamtx
 
   deploy-checks:
     runs-on: ubuntu-latest
@@ -77,14 +151,47 @@ jobs:
         run: |
           touch .env
           docker compose -f deploy/docker-compose.yml config --quiet
+      - uses: docker/setup-buildx-action@v3
       - name: Construir imagen del gateway
-        run: docker build -f deploy/Dockerfile --target gateway -t sistema-camaras-gateway:ci .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: gateway
+          load: true
+          tags: sistema-camaras-gateway:ci
+          cache-from: type=gha,scope=gateway
       - name: Construir imagen web
-        run: docker build -f deploy/Dockerfile --target web -t sistema-camaras-web:ci .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: web
+          load: true
+          tags: sistema-camaras-web:ci
+          cache-from: type=gha,scope=web
+      - name: Escanear vulnerabilidades en la imagen del gateway
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sistema-camaras-gateway:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Escanear vulnerabilidades en la imagen web
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sistema-camaras-web:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
 
   publish-images:
     if: github.event_name == 'push'
-    needs: [validate, deploy-checks]
+<<<<<<< HEAD
+    needs: [validate, e2e, deploy-checks]
+=======
+    needs: [validate, deploy-checks, rtsp-integration]
+>>>>>>> origin/develop
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -132,7 +239,11 @@ jobs:
 
   promote:
     if: github.event_name == 'push' && (github.ref_name == 'develop' || github.ref_name == 'staging')
-    needs: [validate, deploy-checks]
+<<<<<<< HEAD
+    needs: [validate, e2e, deploy-checks]
+=======
+    needs: [validate, deploy-checks, rtsp-integration]
+>>>>>>> origin/develop
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

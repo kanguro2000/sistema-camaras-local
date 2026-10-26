@@ -24,12 +24,35 @@ Reglas:
 | Job              | Cuándo                                     | Qué hace                                                                             |
 | ---------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
 | `branch-flow`    | PR hacia `develop`, `staging` o `master`   | Verifica el origen permitido del PR.                                                 |
-| `validate`       | PR y push a las tres ramas                 | Instala, lint, typecheck, pruebas unitarias y E2E, build.                            |
+| `validate`       | PR y push a las tres ramas                 | Instala, lint, typecheck, pruebas unitarias, build, auditoría y cobertura.           |
+| `e2e`            | PR y push a las tres ramas                 | Pruebas E2E con Playwright, en paralelo a `validate` y con caché de Chromium.        |
 | `deploy-checks`  | PR y push a las tres ramas                 | ShellCheck de `deploy/*.sh`, `docker compose config` y build de las imágenes Docker. |
+| `rtsp-integration` | PR y push a las tres ramas               | Levanta MediaMTX y una cámara RTSP simulada (FFmpeg) y prueba el gateway de punta a punta. |
 | `publish-images` | Solo push (tras fusionar) a las tres ramas | Publica `gateway` y `web` en GHCR con la etiqueta del ambiente y `sha-<commit>`.     |
 | `promote`        | Push a `develop` o `staging`               | Abre el PR de promoción a la rama siguiente si hay cambios y no existe uno abierto.  |
 
-`publish-images` y `promote` solo se ejecutan si `validate` y `deploy-checks` pasan.
+<<<<<<< HEAD
+`publish-images` y `promote` solo se ejecutan si `validate`, `e2e` y `deploy-checks` pasan.
+=======
+`publish-images` y `promote` solo se ejecutan si `validate`, `deploy-checks` y `rtsp-integration` pasan.
+
+### Prueba con cámara RTSP simulada
+
+`rtsp-integration` ejecuta `apps/gateway/src/infrastructure/media/rtsp-camera.integration.test.ts` contra un servidor MediaMTX y un publicador FFmpeg que hace de cámara. Verifica que el gateway genera HLS reproducible (segmentos MPEG-TS), que se recupera solo cuando la cámara se apaga y vuelve, y (solo en Linux) que detecta una cámara congelada y reanuda al despertar. Para correrla en local necesitas FFmpeg en el `PATH` y MediaMTX escuchando en `rtsp://127.0.0.1:8554` (`RTSP_SERVER` cambia la dirección):
+
+```bash
+docker run -d --rm --name mediamtx --network host bluenviron/mediamtx:1.21.3
+RTSP_INTEGRATION=1 pnpm test:rtsp
+```
+
+Sin `RTSP_INTEGRATION=1` las pruebas se omiten, por lo que `pnpm test` sigue sin requerir FFmpeg.
+>>>>>>> origin/develop
+
+### Seguridad y calidad
+
+- `validate` ejecuta `pnpm audit --prod --audit-level=high` (falla con vulnerabilidades altas o críticas) y publica la cobertura de pruebas unitarias (`pnpm test:coverage`) en el resumen del job.
+- `deploy-checks` escanea con Trivy las imágenes `gateway` y `web` y falla ante vulnerabilidades CRITICAL con corrección disponible.
+- `.github/workflows/codeql.yml` analiza el código con CodeQL en cada PR, push y cada lunes. Los resultados aparecen en Security → Code scanning.
 
 ## 3. Imágenes y despliegue manual
 
@@ -55,6 +78,24 @@ echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u <usuario> --password-stdin
 
 Para volver a una versión anterior, repite el comando con `IMAGE_TAG=sha-<commit-anterior>`. Haz respaldo antes de cambiar de versión (ver [runbook](./operations-runbook.md)).
 
+### Versiones y Releases
+
+Una versión es una etiqueta `vX.Y.Z` sobre un commit de `master` (versionado semántico: `X` cambios incompatibles, `Y` funciones nuevas, `Z` correcciones). Cuando `master` ya pasó CI y publicó sus imágenes:
+
+```bash
+git switch master && git pull --ff-only
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+El workflow `release.yml`:
+
+1. Verifica que el commit pertenece a `master`.
+2. Etiqueta las imágenes ya probadas (`sha-<commit>`) también como `v1.0.0`, sin reconstruirlas.
+3. Crea la Release en GitHub con notas generadas desde los PR fusionados, agrupadas según `.github/release.yml` (usa las etiquetas `feature`, `bug`, `security`, `documentation`, etc.).
+
+Despliegue de una versión fija: `IMAGE_TAG=v1.0.0`. Si la etiqueta se empuja antes de que CI de `master` termine, el workflow falla con un aviso; vuelve a ejecutarlo cuando las imágenes existan.
+
 ## 4. Configuración requerida en GitHub
 
 No se puede aplicar desde el repositorio; hazlo en **Settings**:
@@ -62,7 +103,7 @@ No se puede aplicar desde el repositorio; hazlo en **Settings**:
 1. **Actions → General → Workflow permissions**: activar _Allow GitHub Actions to create and approve pull requests_ (necesario para `promote`).
 2. **Rules → Rulesets** (o Branch protection) para `develop`, `staging` y `master`:
    - Exigir PR antes de fusionar y bloquear force-push y borrado.
-   - Exigir los checks `validate`, `deploy-checks` y `branch-flow`.
+   - Exigir los checks `validate`, `e2e`, `deploy-checks` y `branch-flow`.
    - Exigir que la rama esté actualizada antes de fusionar.
 3. **General → Pull Requests**: activar _Automatically delete head branches_ (no afecta a `develop` y `staging`, que están protegidas).
 4. **Packages**: tras la primera publicación, enlazar o ajustar la visibilidad de los paquetes de GHCR según prefieras.

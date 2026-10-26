@@ -18,7 +18,8 @@ RUN pnpm exec tsc -b --clean packages/shared apps/gateway \
     && pnpm exec tsc -b packages/shared apps/gateway \
     && test -f packages/shared/dist/index.d.ts \
     && pnpm --filter @sistema-camaras/web build \
-    && pnpm install --prod --offline --frozen-lockfile
+    && pnpm install --prod --offline --frozen-lockfile \
+    && pnpm prune --prod
 
 FROM node:24-bookworm-slim AS gateway
 

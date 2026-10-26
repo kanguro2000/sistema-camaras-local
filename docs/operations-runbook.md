@@ -213,6 +213,31 @@ Restaura también el `.env` correspondiente al respaldo si la instalación fue
 reconstruida, asegurándote de que contiene el mismo `MASTER_KEY`. No reemplaces
 el archivo de secretos actual sin verificarlo.
 
+### Respaldo automático diario
+
+`deploy/backup.sh` copia `data/app.db` (con `sqlite3 .backup` si está instalado; si no, detiene el gateway unos segundos) y guarda también el `.env` con permisos `600`, porque sin `MASTER_KEY` la base no sirve. Conserva los últimos 14 respaldos. Variables opcionales: `BACKUP_DIR` (por defecto `/var/backups/sistema-camaras` como root o `~/.local/state/sistema-camaras-local/backups`), `BACKUP_KEEP` y `BACKUP_INCLUDE_ENV=0` para no copiar el `.env`.
+
+```bash
+sudo bash deploy/backup.sh            # respaldo manual
+sudo bash deploy/install-ops-timers.sh # programa respaldo diario 03:30 y chequeo de salud
+```
+
+Los respaldos quedan en el mismo servidor: cópialos periódicamente a otro disco o equipo, **cifrados**, ya que incluyen el `.env`.
+
+## Monitoreo de salud
+
+`deploy/health-check.sh` corre cada 5 minutos (timer `sistema-camaras-health`) y verifica: respuesta de `/api/health`, contenedores `gateway` y `web` en ejecución, cantidad de errores del gateway en los últimos 10 minutos (umbral 20, indicio de cámaras caídas; solo cuenta, no imprime logs) y uso de disco de `data/` (máximo 90 %). Si algo falla, termina con error y queda registrado.
+
+```bash
+systemctl list-timers 'sistema-camaras-*'                 # próximos y últimos disparos
+journalctl -u sistema-camaras-health.service -n 50 --no-pager
+journalctl -u sistema-camaras-backup.service -n 20 --no-pager
+systemctl --failed                                        # muestra chequeos fallidos
+sudo bash deploy/install-ops-timers.sh --remove           # desinstalar
+```
+
+Umbrales ajustables con las variables `ERROR_WINDOW`, `ERROR_THRESHOLD`, `DISK_MAX_PERCENT` y `HEALTH_URL`. Este chequeo no envía notificaciones por sí solo; consulta `systemctl --failed` o el journal.
+
 ## 6. Problemas comunes
 
 | Síntoma                                           | Comprobaciones y acciones                                                                                                                                                                                                                  |
