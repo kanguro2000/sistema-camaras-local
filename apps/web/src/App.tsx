@@ -135,6 +135,17 @@ export default function App({ service, store }: { service: AppService; store: Ap
   }, [logout, service, setUser, token, user]);
 
   useEffect(() => {
+    const handleSessionExpired = () => {
+      logout();
+      lastGridFocus.current = null;
+      setView("login");
+      setError("La sesión expiró. Inicia sesión de nuevo.");
+    };
+    window.addEventListener("auth-expired", handleSessionExpired);
+    return () => window.removeEventListener("auth-expired", handleSessionExpired);
+  }, [logout]);
+
+  useEffect(() => {
     if (!token) return;
     refreshCameras()
       .catch((e) => setError(String(e)));
@@ -282,6 +293,19 @@ export default function App({ service, store }: { service: AppService; store: Ap
     }
   };
 
+  const handleLogout = async () => {
+    setError(null);
+    try {
+      await service.logout();
+    } catch (cause) {
+      setError(`No se pudo invalidar la sesión en el gateway: ${String(cause)}`);
+    } finally {
+      logout();
+      lastGridFocus.current = null;
+      setView("login");
+    }
+  };
+
   if (token && !user) {
     return <div className="login" role="status">Restaurando sesión…</div>;
   }
@@ -355,11 +379,7 @@ export default function App({ service, store }: { service: AppService; store: Ap
           {user?.role === "admin" && (
             <button type="button" onClick={() => setView("manage")}>Administrar cámaras</button>
           )}
-          <button type="button" onClick={() => {
-            logout();
-            lastGridFocus.current = null;
-            setView("login");
-          }}>Cerrar sesión</button>
+          <button type="button" onClick={() => void handleLogout()}>Cerrar sesión</button>
         </nav>
       </header>
       <div className="grid">

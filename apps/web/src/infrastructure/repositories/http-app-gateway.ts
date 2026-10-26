@@ -26,6 +26,10 @@ export class HttpAppGateway implements AppGateway {
     return UserSchema.parse(await this.api("/api/auth/me"));
   }
 
+  async logout() {
+    await this.api("/api/auth/logout", { method: "POST" });
+  }
+
   async listCameras(): Promise<Camera[]> {
     const result = await this.api<{ items: unknown }>("/api/cameras");
     if (!Array.isArray(result.items)) throw new Error("Invalid camera-list response");

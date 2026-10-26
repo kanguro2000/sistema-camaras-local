@@ -15,6 +15,9 @@ const { readStreamTicket, streamTicketCookie } = await import(
 const { JwtStreamTicketService } = await import("./infrastructure/security/jwt-stream-ticket.service.js");
 const streamTickets = new JwtStreamTicketService(process.env.JWT_SECRET!);
 const { JwtAccessTokenService } = await import("./infrastructure/security/jwt-access-token.service.js");
+const { readRefreshToken, clearRefreshTokenCookie } = await import(
+  "./interfaces/http/guards/refresh-token-cookie.js"
+);
 const { buildApp } = await import("./app.js");
 
 function authorizationHeader(token: string) {
@@ -82,6 +85,85 @@ test("camera API omits credentials and stream resources require a scoped ticket"
       method: "POST",
       url: "/api/auth/login",
       payload: { username: "admin", password: process.env.ADMIN_PASSWORD },
+    });
+
+    test("auth refresh rotates its HttpOnly cookie and logout revokes the session", async () => {
+      const app = await buildApp();
+      try {
+        const login = async () => app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username: "admin", password: process.env.ADMIN_PASSWORD },
+        });
+        const firstLogin = await login();
+        assert.equal(firstLogin.statusCode, 200);
+        assert.equal("refreshToken" in firstLogin.json(), false);
+        const firstCookieHeader = String(firstLogin.headers["set-cookie"]);
+        assert.match(firstCookieHeader, /HttpOnly/);
+        assert.match(firstCookieHeader, /SameSite=Strict/);
+        assert.match(firstCookieHeader, /Path=\/api\/auth/);
+        const firstRefreshToken = readRefreshToken(firstCookieHeader);
+        assert.ok(firstRefreshToken);
+
+        const firstRefresh = await app.inject({
+          method: "POST",
+          url: "/api/auth/refresh",
+          headers: { cookie: `camera_refresh=${firstRefreshToken}` },
+        });
+        assert.equal(firstRefresh.statusCode, 200);
+        assert.equal(typeof firstRefresh.json<{ accessToken: unknown }>().accessToken, "string");
+        assert.equal("refreshToken" in firstRefresh.json(), false);
+        const rotatedToken = readRefreshToken(String(firstRefresh.headers["set-cookie"]));
+        assert.ok(rotatedToken);
+        assert.notEqual(rotatedToken, firstRefreshToken);
+
+        const replayed = await app.inject({
+          method: "POST",
+          url: "/api/auth/refresh",
+          headers: { cookie: `camera_refresh=${firstRefreshToken}` },
+        });
+        assert.equal(replayed.statusCode, 401);
+        const revokedAfterReplay = await app.inject({
+          method: "POST",
+          url: "/api/auth/refresh",
+          headers: { cookie: `camera_refresh=${rotatedToken}` },
+        });
+        assert.equal(revokedAfterReplay.statusCode, 401);
+
+        const secondLogin = await login();
+        const secondRefreshToken = readRefreshToken(String(secondLogin.headers["set-cookie"]));
+        assert.ok(secondRefreshToken);
+        const logout = await app.inject({
+          method: "POST",
+          url: "/api/auth/logout",
+          headers: { cookie: `camera_refresh=${secondRefreshToken}` },
+        });
+        assert.equal(logout.statusCode, 204);
+        assert.equal(readRefreshToken(String(logout.headers["set-cookie"])), null);
+        assert.match(String(logout.headers["set-cookie"]), /Max-Age=0/);
+        assert.equal(clearRefreshTokenCookie(false).includes("Secure"), false);
+
+        const afterLogout = await app.inject({
+          method: "POST",
+          url: "/api/auth/refresh",
+          headers: { cookie: `camera_refresh=${secondRefreshToken}` },
+        });
+        assert.equal(afterLogout.statusCode, 401);
+
+        const expiringLogin = await login();
+        const expiringRefreshToken = readRefreshToken(String(expiringLogin.headers["set-cookie"]));
+        assert.ok(expiringRefreshToken);
+        const { getDatabase } = await import("./infrastructure/db/sqlite.database.js");
+        getDatabase().prepare("UPDATE refresh_sessions SET expires_at = 0").run();
+        const expired = await app.inject({
+          method: "POST",
+          url: "/api/auth/refresh",
+          headers: { cookie: `camera_refresh=${expiringRefreshToken}` },
+        });
+        assert.equal(expired.statusCode, 401);
+      } finally {
+        await app.close();
+      }
     });
     assert.equal(login.statusCode, 200);
     const loginResult = login.json<{

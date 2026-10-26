@@ -54,5 +54,18 @@ function migrate(db: DatabaseSync) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS refresh_sessions (
+      session_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      username TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('admin','viewer')),
+      expires_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      token_hash TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES refresh_sessions(session_id) ON DELETE CASCADE,
+      consumed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_refresh_tokens_session_id ON refresh_tokens(session_id);
   `);
 }

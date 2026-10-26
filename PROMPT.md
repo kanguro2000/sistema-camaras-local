@@ -35,7 +35,7 @@ Construir una aplicación **local-first** que permita ver en vivo, en una TV, el
 | Framework API | Fastify (o Express) + Zod para validación |
 | Base de datos | SQLite (better-sqlite3) para config/usuarios/cámaras |
 | Media relay | mediamtx (binario) + ffmpeg para transcode audio |
-| Auth | JWT (access + refresh) + bcrypt; modo "single user" por defecto |
+| Auth | JWT access (15 min) + refresh opaco rotatorio (7 días) en cookie HttpOnly + bcrypt; modo "single user" por defecto |
 | Frontend | React 18 + Vite + TypeScript |
 | Estilos | Tailwind CSS + focus-visible para TV |
 | Reproductor | hls.js (fallback nativo `<video>`) |

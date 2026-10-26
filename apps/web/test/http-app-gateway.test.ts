@@ -43,6 +43,7 @@ test("camera management adapter sends authenticated CRUD and probe requests", as
     jsonResponse({ ok: true, codecVideo: "h264", width: 1920, height: 1080 }),
     new Response(null, { status: 204 }),
     jsonResponse({ items: [] }),
+    new Response(null, { status: 204 }),
   ];
   const requests: Array<{ url: string; init: RequestInit }> = [];
   const originalFetch = globalThis.fetch;
@@ -84,6 +85,7 @@ test("camera management adapter sends authenticated CRUD and probe requests", as
 
     await gateway.deleteCamera(camera.id);
     assert.deepEqual(await gateway.listCameras(), []);
+    await gateway.logout();
 
     assert.deepEqual(requests.map(({ url, init }) => [url, init.method ?? "GET"]), [
       ["/api/auth/me", "GET"],
@@ -94,6 +96,7 @@ test("camera management adapter sends authenticated CRUD and probe requests", as
       [`/api/cameras/${camera.id}/probe`, "POST"],
       [`/api/cameras/${camera.id}`, "DELETE"],
       ["/api/cameras", "GET"],
+      ["/api/auth/logout", "POST"],
     ]);
     assert.equal(new Headers(requests[1]?.init.headers).get("Authorization"), "Bearer test-access-token");
     assert.deepEqual(JSON.parse(String(requests[3]?.init.body)), {

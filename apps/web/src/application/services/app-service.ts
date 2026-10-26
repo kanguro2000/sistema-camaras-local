@@ -8,6 +8,10 @@ export class AppService {
     return this.gateway.login(username, password);
   }
 
+  logout() {
+    return this.gateway.logout();
+  }
+
   currentUser() {
     return this.gateway.currentUser();
   }

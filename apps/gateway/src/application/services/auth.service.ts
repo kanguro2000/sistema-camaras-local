@@ -1,9 +1,11 @@
 import { UserRepository } from "../../domain/repositories/user.repository.js";
 import { AccessTokenService, AuthenticatedUser } from "../../domain/services/access-token-service.js";
 import { PasswordHasher } from "../../domain/services/password-hasher.js";
+import type { RefreshTokenService } from "../../domain/services/refresh-token-service.js";
 
 export interface AuthResult {
   accessToken: string;
+  refreshToken: string;
   user: { id: string; username: string; role: "admin" | "viewer" };
 }
 
@@ -12,6 +14,7 @@ export class AuthService {
     private readonly users: UserRepository,
     private readonly passwords: PasswordHasher,
     private readonly accessTokens: AccessTokenService,
+    private readonly refreshTokens: RefreshTokenService,
   ) {}
 
   async login(username: string, password: string): Promise<AuthResult | null> {
@@ -25,8 +28,27 @@ export class AuthService {
     };
     return {
       accessToken: this.accessTokens.issue(identity),
+      refreshToken: this.refreshTokens.issue(identity),
       user: { id: user.id, username: user.username, role: user.role },
     };
+  }
+
+  refresh(refreshToken: string | null): AuthResult | null {
+    const rotated = this.refreshTokens.rotate(refreshToken);
+    if (!rotated) return null;
+    return {
+      accessToken: this.accessTokens.issue(rotated.user),
+      refreshToken: rotated.token,
+      user: {
+        id: rotated.user.sub,
+        username: rotated.user.username,
+        role: rotated.user.role,
+      },
+    };
+  }
+
+  logout(refreshToken: string | null): void {
+    this.refreshTokens.revoke(refreshToken);
   }
 
   authenticate(token: string): AuthenticatedUser | null {

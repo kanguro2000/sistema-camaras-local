@@ -12,7 +12,8 @@
 
 ## 2. Autenticación
 
-- JWT access (15 min) + refresh (7 días), rotación de refresh.
+- JWT access (15 min) + refresh opaco (7 días), rotación de un solo uso y revocación de sesión al reutilizar un token consumido.
+- El refresh token se almacena hasheado en SQLite y se entrega solo mediante cookie `HttpOnly`, `SameSite=Strict` y con `Secure` en HTTPS. Logout revoca la sesión de refresh; el JWT de acceso vigente conserva su expiración máxima de 15 minutos.
 - bcrypt (cost 12) para passwords de usuario.
 - Rate limiting en `/api/auth/login` (5/min por IP).
 - Cabeceras de seguridad HTTP mediante Helmet; secretos requeridos y validados al arrancar.

@@ -11,10 +11,12 @@
 ## 2. Endpoints
 
 ### Auth
-- `POST /api/auth/login` { username, password } → { accessToken, refreshToken, user }
+- `POST /api/auth/login` { username, password } → { accessToken, user }; sets an opaque refresh token in an `HttpOnly`, `SameSite=Strict` cookie scoped to `/api/auth`
 - `GET /api/auth/me` → usuario autenticado (id, username, role)
-- `POST /api/auth/refresh` { refreshToken } → { accessToken }
-- `POST /api/auth/logout`
+- `POST /api/auth/refresh` → { accessToken }; reads and rotates the refresh cookie. Refresh tokens are single-use, stored hashed in SQLite, and expire after 7 days.
+- `POST /api/auth/logout` → revokes the refresh session and clears the cookie. A previously issued access JWT remains valid until its 15-minute expiration; the client clears it immediately.
+
+The web client retries an API request once after a 401 by refreshing the access token. Concurrent 401 responses share one refresh request. Refresh tokens are never returned in JSON or stored in browser storage.
 
 ### Users (admin)
 - `GET /api/users`

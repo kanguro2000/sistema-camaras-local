@@ -4,6 +4,7 @@ import type { CameraProbeResult, CameraStreamHealth } from "@sistema-camaras/sha
 
 export interface AppGateway {
   login(username: string, password: string): Promise<{ accessToken: string; user: User }>;
+  logout(): Promise<void>;
   currentUser(): Promise<User>;
   listCameras(): Promise<Camera[]>;
   createCamera(input: CameraCreateInput): Promise<Camera>;
