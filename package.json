@@ -12,6 +12,8 @@
     "typecheck": "pnpm --filter @sistema-camaras/shared build && pnpm -r typecheck && pnpm exec tsc -p tsconfig.e2e.json --noEmit",
     "test": "pnpm -r test && pnpm test:e2e",
     "test:e2e": "playwright test",
+    "test:coverage": "pnpm -r test:coverage",
+    "test:rtsp": "pnpm --filter @sistema-camaras/gateway test:integration",
     "secrets": "node scripts/generate-secrets.mjs"
   },
   "engines": {

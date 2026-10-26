@@ -1,0 +1,7 @@
+[Unit]
+Description=Respaldo de la base de Sistema de camaras local
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash __ROOT_DIR__/deploy/backup.sh
