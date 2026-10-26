@@ -8,15 +8,21 @@ Visualización en vivo de cámaras TP-Link Tapo en TVs Hisense (Vidaa) y TCL (An
 - `MEMORY.md` — memoria y decisiones (ADR).
 - `AGENTS.md` — guía para agentes de código.
 - `specs/` — especificaciones técnicas.
+- [`docs/operations-runbook.md`](docs/operations-runbook.md) — comandos de operación, respaldos y solución de problemas.
 - `skills/` — skills para agentes.
 
 ## Inicio rápido (desarrollo)
 
+Se requiere Node.js 24 o superior y pnpm 12.
+
 ```bash
 pnpm install
+pnpm exec playwright install chromium # primera vez, para las pruebas E2E
 pnpm secrets           # genera .env con secretos aleatorios; no los imprime
 pnpm dev               # gateway + web
 ```
+
+`pnpm test` ejecuta pruebas unitarias y flujos E2E de navegador; estos últimos usan respuestas simuladas del gateway y no requieren cámaras reales.
 
 La contraseña inicial de `admin` se guarda en `.env`; consúltala solo en el equipo de confianza donde corre el gateway. No uses valores de ejemplo para `JWT_SECRET` o `MASTER_KEY`. Si `.env` ya existe, el generador se niega a sobrescribirlo.
 
@@ -41,6 +47,9 @@ El script instala Docker/Compose sin agregar el usuario al grupo `docker`, crea 
 Se requiere conectividad a Internet durante la primera construcción de las imágenes. No configures reenvío del puerto 8080 desde el router a Internet. Ver `deploy/TESTING.md` para la checklist posterior.
 
 Despliegue manual: ver `specs/10-deployment-ops.md`.
+
+Para comandos de operación cotidiana, reinicios, actualización, respaldo y
+solución de problemas, consulta el [runbook técnico](docs/operations-runbook.md).
 
 ## Diagnóstico de errores
 

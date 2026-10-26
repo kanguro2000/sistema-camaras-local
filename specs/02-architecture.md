@@ -14,7 +14,7 @@
 ## 2. Componentes
 
 ### 2.1 Media Gateway (`apps/gateway`)
-- Servidor Node.js 20 + Fastify.
+- Servidor Node.js 24 + Fastify (versión mínima compartida por desarrollo, CI y despliegue).
 - Gestiona cámaras (CRUD, cifrado credenciales).
 - Auth (JWT).
 - Orquesta FFmpeg para convertir RTSP a HLS bajo demanda.

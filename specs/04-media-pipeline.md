@@ -41,6 +41,7 @@ El despliegue actual no usa MediaMTX y no transcodifica H.265 a H.264; esos esce
 - Backoff exponencial: 1 s, 2 s, 4 s, 8 s, 16 s, max 30 s.
 - Tras reconexión exitosa, reset backoff.
 - Estado reportado en health endpoint y UI.
+- El estado `running` se confirma solo cuando la playlist `#EXTM3U` referencia al menos un segmento TS existente y no vacío; la presencia del proceso o de segmentos no referenciados no basta. Hasta entonces, el estado permanece `starting`.
 
 ## 6. Codecs y compatibilidad TV
 

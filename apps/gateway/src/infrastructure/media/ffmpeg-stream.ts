@@ -3,6 +3,42 @@ import fs from "node:fs";
 import path from "node:path";
 import { redactRtspCredentials } from "../security/secret-redaction.js";
 
+export function hasPlayableHlsOutput(outputDir: string): boolean {
+  const playlistPath = path.join(outputDir, "index.m3u8");
+  if (!fs.existsSync(playlistPath)) return false;
+
+  let playlist: string;
+  try {
+    playlist = fs.readFileSync(playlistPath, "utf8");
+  } catch (error) {
+    if (isMissingFileError(error)) return false;
+    throw error;
+  }
+  if (!playlist.startsWith("#EXTM3U")) return false;
+
+  const segments = playlist
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+
+  return segments.some((segment) => {
+    if (path.basename(segment) !== segment || !segment.endsWith(".ts")) return false;
+    const segmentPath = path.join(outputDir, segment);
+    if (!fs.existsSync(segmentPath)) return false;
+    try {
+      const stat = fs.statSync(segmentPath);
+      return stat.isFile() && stat.size > 0;
+    } catch (error) {
+      if (isMissingFileError(error)) return false;
+      throw error;
+    }
+  });
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
 export interface StreamHealth {
   status: "starting" | "running" | "stopped" | "error";
   pid?: number;
@@ -33,6 +69,15 @@ export class FfmpegStream {
 
   get hlsPath() {
     return path.join(this.outputDir, "index.m3u8");
+  }
+
+  refreshHealth() {
+    if (this.proc && this.health.status === "starting") {
+      if (hasPlayableHlsOutput(this.outputDir)) {
+        this.health = { ...this.health, status: "running", lastError: undefined };
+      }
+    }
+    return this.health;
   }
 
   start(rtspUrl?: string) {
@@ -77,9 +122,6 @@ export class FfmpegStream {
       this.proc = null;
       this.reportFailure(`Failed to spawn ffmpeg: ${err.message}`);
       this.scheduleRestart();
-    });
-    this.proc.stdout?.on("data", () => {
-      if (this.health.status === "starting") this.health.status = "running";
     });
     this.proc.stderr?.on("data", (d: Buffer) => {
       const msg = d.toString().trim();

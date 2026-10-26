@@ -20,6 +20,8 @@ import { cameraRoutesFactory } from "./interfaces/http/routes/camera.routes.js";
 import { streamRoutesFactory } from "./interfaces/http/routes/stream.routes.js";
 import { StreamManager } from "./infrastructure/media/stream-manager.js";
 import { JwtStreamTicketService } from "./infrastructure/security/jwt-stream-ticket.service.js";
+import { OpaqueRefreshTokenService } from "./infrastructure/security/opaque-refresh-token.service.js";
+import { SqliteRefreshSessionRepository } from "./infrastructure/repositories/sqlite-refresh-session.repository.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -46,6 +48,7 @@ export async function buildApp() {
     userRepo,
     new BcryptPasswordHasher(),
     new JwtAccessTokenService(config.jwtSecret),
+    new OpaqueRefreshTokenService(new SqliteRefreshSessionRepository()),
   );
   const cameras = new CameraService(cameraRepo, { probe: probeRtsp });
   const streamTickets = new JwtStreamTicketService(config.jwtSecret);

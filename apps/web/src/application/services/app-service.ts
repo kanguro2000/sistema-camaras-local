@@ -8,6 +8,10 @@ export class AppService {
     return this.gateway.login(username, password);
   }
 
+  logout() {
+    return this.gateway.logout();
+  }
+
   currentUser() {
     return this.gateway.currentUser();
   }
@@ -34,6 +38,10 @@ export class AppService {
 
   openStream(cameraId: string) {
     return this.gateway.openStream(cameraId);
+  }
+
+  cameraStreamHealth(cameraId: string) {
+    return this.gateway.cameraStreamHealth(cameraId);
   }
 
   refreshStreamTicket(cameraId: string) {

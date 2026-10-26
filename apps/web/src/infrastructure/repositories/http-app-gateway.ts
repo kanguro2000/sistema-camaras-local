@@ -1,4 +1,9 @@
-import { CameraProbeResultSchema, CameraSchema, UserSchema } from "@sistema-camaras/shared";
+import {
+  CameraProbeResultSchema,
+  CameraSchema,
+  CameraStreamHealthSchema,
+  UserSchema,
+} from "@sistema-camaras/shared";
 import { Camera, CameraCreateInput, CameraUpdateInput } from "../../domain/entities/camera.js";
 import { AppGateway } from "../../domain/repositories/app-gateway.js";
 import { ApiClient } from "../http/api-client.js";
@@ -19,6 +24,10 @@ export class HttpAppGateway implements AppGateway {
 
   async currentUser() {
     return UserSchema.parse(await this.api("/api/auth/me"));
+  }
+
+  async logout() {
+    await this.api("/api/auth/logout", { method: "POST" });
   }
 
   async listCameras(): Promise<Camera[]> {
@@ -55,8 +64,20 @@ export class HttpAppGateway implements AppGateway {
     );
   }
 
-  openStream(cameraId: string) {
-    return this.api<{ hlsUrl: string }>(`/api/cameras/${encodeURIComponent(cameraId)}/stream`);
+  async openStream(cameraId: string) {
+    const result = await this.api<{ hlsUrl: unknown; health: unknown }>(
+      `/api/cameras/${encodeURIComponent(cameraId)}/stream`,
+    );
+    if (typeof result.hlsUrl !== "string") {
+      throw new Error("Invalid camera-stream response");
+    }
+    return { hlsUrl: result.hlsUrl, health: CameraStreamHealthSchema.parse(result.health) };
+  }
+
+  async cameraStreamHealth(cameraId: string) {
+    return CameraStreamHealthSchema.parse(
+      await this.api(`/api/cameras/${encodeURIComponent(cameraId)}/health`),
+    );
   }
 
   async refreshStreamTicket(cameraId: string) {

@@ -13,3 +13,6 @@ coverage
 mediamtx
 *.tsbuildinfo
 data
+.tsupgrader/
+/playwright-report/
+/test-results/

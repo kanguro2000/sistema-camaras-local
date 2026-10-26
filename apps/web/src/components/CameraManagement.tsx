@@ -1,7 +1,8 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CameraProbeResult } from "@sistema-camaras/shared";
 import type { AppService } from "../application/services/app-service.js";
 import type { Camera, CameraCreateInput, CameraUpdateInput } from "../domain/entities/camera.js";
+import { getSpatialDirection, isRemoteBackKey, navigateSpatially } from "../lib/spatial-navigation.js";
 
 interface CameraManagementProps {
   cameras: Camera[];
@@ -55,34 +56,106 @@ export default function CameraManagement({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const formReturnFocus = useRef<HTMLElement | null>(null);
+  const formInitialFocus = useRef<HTMLInputElement | null>(null);
+  const deleteReturnFocus = useRef<HTMLButtonElement | null>(null);
+  const deleteDialogRef = useRef<HTMLElement | null>(null);
+  const deleteDialogWasOpen = useRef(false);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      const typing = event.target instanceof HTMLInputElement && event.target.type !== "checkbox";
-      if (event.key === "Escape" || (event.key === "Backspace" && !typing)) {
+      const target = event.target;
+      const typing = (target instanceof HTMLInputElement
+        && !["checkbox", "radio", "button", "submit", "reset"].includes(target.type))
+        || target instanceof HTMLTextAreaElement
+        || (target instanceof HTMLElement && target.isContentEditable);
+      if (isRemoteBackKey(event) && (event.key !== "Backspace" || !typing)) {
         event.preventDefault();
         if (pendingDelete) setPendingDelete(null);
         else if (formOpen) setFormOpen(false);
         else onBack();
         return;
       }
-      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-      const controls = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          ".camera-management button:not(:disabled), .camera-management input:not(:disabled)",
-        ),
-      );
-      const currentIndex = controls.findIndex((control) => control === document.activeElement);
-      if (currentIndex < 0 || controls.length === 0) return;
-      event.preventDefault();
-      const offset = event.key === "ArrowDown" ? 1 : -1;
-      controls[(currentIndex + offset + controls.length) % controls.length]?.focus();
+      const direction = getSpatialDirection(event);
+      if (!direction) return;
+      const container = pendingDelete
+        ? deleteDialogRef.current
+        : document.querySelector<HTMLElement>(".camera-management");
+      if (container && navigateSpatially(container, direction)) event.preventDefault();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [formOpen, onBack, pendingDelete]);
 
+  useLayoutEffect(() => {
+    if (pendingDelete) {
+      deleteDialogWasOpen.current = true;
+      const dialog = deleteDialogRef.current;
+      if (!dialog) return;
+      const focusDialog = () => {
+        const firstButton = dialog.querySelector<HTMLButtonElement>("button:not(:disabled)");
+        (firstButton ?? dialog).focus();
+      };
+      focusDialog();
+
+      const handleFocusIn = (event: FocusEvent) => {
+        if (event.target instanceof Node && !dialog.contains(event.target)) {
+          focusDialog();
+        }
+      };
+      const handleTab = (event: KeyboardEvent) => {
+        if (event.key !== "Tab") return;
+        const buttons = Array.from(
+          dialog.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+        );
+        if (buttons.length === 0) {
+          event.preventDefault();
+          dialog.focus();
+          return;
+        }
+        const firstButton = buttons[0];
+        const lastButton = buttons[buttons.length - 1];
+        if (
+          (event.shiftKey && document.activeElement === firstButton)
+          || (!event.shiftKey && document.activeElement === lastButton)
+        ) {
+          event.preventDefault();
+          (event.shiftKey ? lastButton : firstButton)?.focus();
+        }
+      };
+      document.addEventListener("focusin", handleFocusIn);
+      document.addEventListener("keydown", handleTab);
+      return () => {
+        document.removeEventListener("focusin", handleFocusIn);
+        document.removeEventListener("keydown", handleTab);
+      };
+    }
+
+    if (!deleteDialogWasOpen.current) return;
+    deleteDialogWasOpen.current = false;
+    if (deleteReturnFocus.current?.isConnected) {
+      deleteReturnFocus.current.focus();
+    } else {
+      document.querySelector<HTMLButtonElement>(
+        ".camera-management .section-heading button:not(:disabled)",
+      )?.focus();
+    }
+    deleteReturnFocus.current = null;
+  }, [pendingDelete]);
+
+  useLayoutEffect(() => {
+    if (formOpen) {
+      formInitialFocus.current?.focus();
+      return;
+    }
+    if (formReturnFocus.current?.isConnected) formReturnFocus.current.focus();
+    formReturnFocus.current = null;
+  }, [formOpen]);
+
   const openCreateForm = () => {
+    formReturnFocus.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     setEditingId(null);
     setForm(EMPTY_FORM);
     setFormOpen(true);
@@ -91,6 +164,9 @@ export default function CameraManagement({
   };
 
   const openEditForm = (camera: Camera) => {
+    formReturnFocus.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     setEditingId(camera.id);
     setForm({
       name: camera.name,
@@ -165,6 +241,7 @@ export default function CameraManagement({
     try {
       await service.deleteCamera(pendingDelete.id);
       setNotice(`Se eliminó «${pendingDelete.name}».`);
+      deleteReturnFocus.current = null;
       setPendingDelete(null);
       await onCamerasChanged();
     } catch (cause) {
@@ -172,6 +249,12 @@ export default function CameraManagement({
     } finally {
       setBusy(false);
     }
+  };
+
+  const openDeleteConfirmation = (camera: Camera, trigger: HTMLButtonElement) => {
+    deleteReturnFocus.current = trigger;
+    deleteDialogWasOpen.current = true;
+    setPendingDelete(camera);
   };
 
   const probeCamera = async (camera: Camera) => {
@@ -227,7 +310,11 @@ export default function CameraManagement({
                     {probingId === camera.id ? "Probando…" : "Probar conexión"}
                   </button>
                   <button type="button" onClick={() => openEditForm(camera)}>Editar</button>
-                  <button type="button" className="danger-button" onClick={() => setPendingDelete(camera)}>
+                  <button
+                    type="button"
+                    className="danger-button"
+                    onClick={(event) => openDeleteConfirmation(camera, event.currentTarget)}
+                  >
                     Eliminar
                   </button>
                 </div>
@@ -248,6 +335,7 @@ export default function CameraManagement({
             <label>
               Nombre
               <input
+                ref={formInitialFocus}
                 required
                 maxLength={64}
                 value={form.name}
@@ -326,9 +414,19 @@ export default function CameraManagement({
       )}
 
       {pendingDelete && (
-        <section className="delete-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="delete-camera-title">
+        <section
+          ref={deleteDialogRef}
+          className="delete-confirmation"
+          role="alertdialog"
+          aria-modal="true"
+          tabIndex={-1}
+          aria-labelledby="delete-camera-title"
+          aria-describedby="delete-camera-description"
+        >
           <h2 id="delete-camera-title">¿Eliminar «{pendingDelete.name}»?</h2>
-          <p>Se borrará su configuración y se detendrá su stream. Esta acción no se puede deshacer.</p>
+          <p id="delete-camera-description">
+            Se borrará su configuración y se detendrá su stream. Esta acción no se puede deshacer.
+          </p>
           <div className="form-actions">
             <button type="button" onClick={() => setPendingDelete(null)} disabled={busy} autoFocus>Cancelar</button>
             <button type="button" className="danger-button" onClick={() => void deleteCamera()} disabled={busy}>

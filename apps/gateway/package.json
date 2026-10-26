@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test": "tsx --test src/security.test.ts"
+    "test": "tsx --test src/security.test.ts src/infrastructure/media/ffmpeg-stream.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",

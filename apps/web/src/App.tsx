@@ -1,11 +1,47 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { CameraStreamHealth } from "@sistema-camaras/shared";
 import { AppService } from "./application/services/app-service.js";
 import { AppStore } from "./store.js";
-import HlsPlayer from "./components/HlsPlayer.js";
-import CameraTile from "./components/CameraTile.js";
-import CameraManagement from "./components/CameraManagement.js";
+import StreamPlayer from "./components/StreamPlayer.js";
+import CameraTile, { type CameraPlaybackStatus } from "./components/CameraTile.js";
+import { getSpatialDirection, isRemoteBackKey, navigateSpatially } from "./lib/spatial-navigation.js";
+
+const CameraManagement = lazy(() => import("./components/CameraManagement.js"));
 
 type View = "login" | "grid" | "fullscreen" | "manage";
+type CameraStreamState = {
+  hlsUrl?: string;
+  health?: CameraStreamHealth;
+  playbackStatus?: CameraPlaybackStatus;
+  requestFailed?: boolean;
+};
+
+const CAMERAS_PER_PAGE = 4;
+const HEALTH_POLL_INTERVAL_MS = 10_000;
+
+function streamStatusLabel(
+  enabled: boolean,
+  streamState: CameraStreamState | undefined,
+): string {
+  if (!enabled) return "Deshabilitada";
+  if (streamState?.requestFailed || streamState?.health?.status === "error") return "Error";
+  if (streamState?.health?.status === "stopped") return "Detenida";
+  if (streamState?.health?.status === "running") {
+    if (streamState.playbackStatus === "playing") return "En vivo";
+    if (streamState.playbackStatus === "error") return "Error de reproducción";
+    return "Cargando video";
+  }
+  return "Conectando";
+}
 
 export default function App({ service, store }: { service: AppService; store: AppStore }) {
   const { token, user, setAuth, setUser, logout, cameras, setCameras } = store();
@@ -14,8 +50,22 @@ export default function App({ service, store }: { service: AppService; store: Ap
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
+  const [page, setPage] = useState(0);
+  const [streamStates, setStreamStates] = useState<Record<string, CameraStreamState>>({});
   const [fullId, setFullId] = useState<string | null>(null);
   const [fullSrc, setFullSrc] = useState<string | null>(null);
+  const [fullPlaybackStatus, setFullPlaybackStatus] = useState<CameraPlaybackStatus>("loading");
+  const [fullRetryKey, setFullRetryKey] = useState(0);
+  const [fullRetrying, setFullRetrying] = useState(false);
+  const fullRetryButton = useRef<HTMLButtonElement>(null);
+  const restoreGridFocus = useRef(false);
+  const lastGridFocus = useRef<HTMLElement | null>(null);
+  const pageCount = Math.max(1, Math.ceil(cameras.length / CAMERAS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visibleCameras = useMemo(
+    () => cameras.slice(currentPage * CAMERAS_PER_PAGE, (currentPage + 1) * CAMERAS_PER_PAGE),
+    [cameras, currentPage],
+  );
 
   const refreshCameras = useCallback(async () => {
     setCameras(await service.listCameras());
@@ -27,9 +77,51 @@ export default function App({ service, store }: { service: AppService; store: Ap
       const stream = await service.openStream(cameraId);
       setFullId(cameraId);
       setFullSrc(stream.hlsUrl);
+      setFullPlaybackStatus("loading");
+      setFullRetryKey(0);
       setView("fullscreen");
     } catch (err) {
       setError(String(err));
+    }
+  }, [service]);
+
+  const retryFullscreen = useCallback(async () => {
+    if (!fullId || fullRetrying) return;
+    setFullRetrying(true);
+    try {
+      const stream = await service.openStream(fullId);
+      setFullSrc(stream.hlsUrl);
+      setFullRetryKey((current) => current + 1);
+    } catch (err) {
+      setFullPlaybackStatus("error");
+      setError(String(err));
+    } finally {
+      setFullRetrying(false);
+    }
+  }, [fullId, fullRetrying, service]);
+
+  const retryStream = useCallback(async (cameraId: string) => {
+    setStreamStates((current) => ({
+      ...current,
+      [cameraId]: {
+        ...current[cameraId],
+        hlsUrl: undefined,
+        health: { status: "starting", restarts: 0 },
+        playbackStatus: "loading",
+        requestFailed: false,
+      },
+    }));
+    try {
+      const stream = await service.openStream(cameraId);
+      setStreamStates((current) => ({
+        ...current,
+        [cameraId]: { ...current[cameraId], hlsUrl: stream.hlsUrl, health: stream.health },
+      }));
+    } catch {
+      setStreamStates((current) => ({
+        ...current,
+        [cameraId]: { ...current[cameraId], requestFailed: true },
+      }));
     }
   }, [service]);
 
@@ -43,6 +135,7 @@ export default function App({ service, store }: { service: AppService; store: Ap
       .catch(() => {
         if (!active) return;
         logout();
+        lastGridFocus.current = null;
         setView("login");
         setError("La sesión expiró. Inicia sesión de nuevo.");
       });
@@ -52,52 +145,137 @@ export default function App({ service, store }: { service: AppService; store: Ap
   }, [logout, service, setUser, token, user]);
 
   useEffect(() => {
+    const handleSessionExpired = () => {
+      logout();
+      lastGridFocus.current = null;
+      setView("login");
+      setError("La sesión expiró. Inicia sesión de nuevo.");
+    };
+    window.addEventListener("auth-expired", handleSessionExpired);
+    return () => window.removeEventListener("auth-expired", handleSessionExpired);
+  }, [logout]);
+
+  useEffect(() => {
     if (!token) return;
     refreshCameras()
       .catch((e) => setError(String(e)));
   }, [refreshCameras, token]);
 
   useEffect(() => {
-    if (view !== "grid") return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key.startsWith("Arrow")) {
-        const controls = Array.from(document.querySelectorAll<HTMLButtonElement>(".grid-view button"));
-        if (controls.length === 0) return;
-        const currentIndex = controls.findIndex((control) => control === document.activeElement);
-        const direction = event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 1;
-        const nextIndex = currentIndex < 0
-          ? (direction > 0 ? 0 : controls.length - 1)
-          : (currentIndex + direction + controls.length) % controls.length;
-        event.preventDefault();
-        const nextControl = controls[nextIndex];
-        nextControl?.focus();
-        const cameraIndex = Number(nextControl?.dataset.cameraIndex);
-        if (Number.isInteger(cameraIndex) && cameraIndex >= 0) setSelected(cameraIndex);
-      } else if (event.key === "Enter") {
-        const activeControl = document.activeElement?.closest(".grid-view button");
-        if (activeControl) return;
-        if (cameras[selected]) void openCamera(cameras[selected].id);
-      } else if (event.key === "Escape" || event.key === "Backspace") {
-        logout();
-        setView("login");
-      }
+    if (view !== "grid" || !token) return;
+    let active = true;
+    const cameraIds = visibleCameras
+      .filter((camera) => camera.enabled)
+      .map((camera) => camera.id);
+
+    const updateCameraState = (cameraId: string, update: CameraStreamState) => {
+      if (!active) return;
+      setStreamStates((current) => ({
+        ...current,
+        [cameraId]: { ...current[cameraId], ...update },
+      }));
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [view, cameras, selected, openCamera, logout]);
+
+    const startVisibleStreams = async () => {
+      await Promise.all(visibleCameras.map(async (camera) => {
+        if (!camera.enabled) {
+          updateCameraState(camera.id, { health: { status: "stopped", restarts: 0 } });
+          return;
+        }
+        updateCameraState(camera.id, {
+          hlsUrl: undefined,
+          health: { status: "starting", restarts: 0 },
+          playbackStatus: "loading",
+          requestFailed: false,
+        });
+        try {
+          const stream = await service.openStream(camera.id);
+          updateCameraState(camera.id, { hlsUrl: stream.hlsUrl, health: stream.health });
+        } catch {
+          updateCameraState(camera.id, { requestFailed: true });
+        }
+      }));
+    };
+
+    const refreshVisibleHealth = () => {
+      void Promise.all(cameraIds.map(async (cameraId) => {
+        try {
+          const health = await service.cameraStreamHealth(cameraId);
+          updateCameraState(cameraId, { health, requestFailed: false });
+        } catch {
+          updateCameraState(cameraId, { requestFailed: true });
+        }
+      }));
+    };
+
+    void startVisibleStreams();
+    const timer = window.setInterval(refreshVisibleHealth, HEALTH_POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [service, token, view, visibleCameras]);
+
+  useLayoutEffect(() => {
+    if (view !== "grid" || !user) return;
+    if (lastGridFocus.current?.isConnected && !restoreGridFocus.current) return;
+    const container = document.querySelector<HTMLElement>(".grid-view");
+    if (!container) return;
+    const selectedCamera = container.querySelector<HTMLButtonElement>(
+      `[data-camera-index="${selected}"]:not(:disabled)`,
+    );
+    const firstCamera = container.querySelector<HTMLButtonElement>(".tile:not(:disabled)");
+    const target = selectedCamera ?? firstCamera
+      ?? container.querySelector<HTMLButtonElement>(".empty-cameras button");
+    if (!target) return;
+    target.focus();
+    lastGridFocus.current = target;
+    restoreGridFocus.current = false;
+  }, [cameras.length, page, selected, user, view]);
 
   useEffect(() => {
-    if (view !== "fullscreen") return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Backspace") {
-        setView("grid");
-        setFullId(null);
-        setFullSrc(null);
+    if (view !== "grid") return;
+    const handler = (event: KeyboardEvent) => {
+      const direction = getSpatialDirection(event);
+      if (direction) {
+        const container = document.querySelector<HTMLElement>(".grid-view");
+        if (container && navigateSpatially(container, direction)) event.preventDefault();
+        const focusedCamera = document.activeElement instanceof HTMLElement
+          ? document.activeElement.closest<HTMLButtonElement>("[data-camera-index]")
+          : null;
+        if (focusedCamera) {
+          const cameraIndex = Number(focusedCamera.dataset.cameraIndex);
+          if (Number.isInteger(cameraIndex)) setSelected(cameraIndex);
+        }
+      } else if (isRemoteBackKey(event)) {
+        event.preventDefault();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [view]);
+
+  useEffect(() => {
+    if (view !== "fullscreen") return;
+    const handler = (e: KeyboardEvent) => {
+      if (isRemoteBackKey(e)) {
+        e.preventDefault();
+        restoreGridFocus.current = true;
+        setView("grid");
+        setFullId(null);
+        setFullSrc(null);
+        setFullPlaybackStatus("loading");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [view]);
+
+  useEffect(() => {
+    if (view === "fullscreen" && fullPlaybackStatus === "error") {
+      fullRetryButton.current?.focus();
+    }
+  }, [fullPlaybackStatus, view]);
 
   useEffect(() => {
     if (view !== "fullscreen" || !fullId) return;
@@ -125,6 +303,19 @@ export default function App({ service, store }: { service: AppService; store: Ap
     }
   };
 
+  const handleLogout = async () => {
+    setError(null);
+    try {
+      await service.logout();
+    } catch (cause) {
+      setError(`No se pudo invalidar la sesión en el gateway: ${String(cause)}`);
+    } finally {
+      logout();
+      lastGridFocus.current = null;
+      setView("login");
+    }
+  };
+
   if (token && !user) {
     return <div className="login" role="status">Restaurando sesión…</div>;
   }
@@ -147,10 +338,30 @@ export default function App({ service, store }: { service: AppService; store: Ap
     const cam = cameras.find((c) => c.id === fullId);
     return (
       <div className="fullscreen">
-        <HlsPlayer src={fullSrc} className="video-full" />
+        <StreamPlayer
+          key={fullRetryKey}
+          src={fullSrc}
+          className="video-full"
+          onPlaybackStatusChange={setFullPlaybackStatus}
+        />
+        {(fullPlaybackStatus === "error" || fullRetrying) && (
+          <div className="fullscreen-recovery" role="alert">
+            <p>{fullRetrying
+              ? "Reintentando reproducción…"
+              : `No se pudo reproducir el video de ${cam?.name ?? "la cámara"}.`}</p>
+            <button
+              ref={fullRetryButton}
+              type="button"
+              onClick={() => void retryFullscreen()}
+              disabled={fullRetrying}
+            >
+              {fullRetrying ? "Reintentando…" : "Reintentar video"}
+            </button>
+          </div>
+        )}
         <div className="overlay">
           <span>{cam?.name}</span>
-          <span>Back: volver</span>
+          <span>Atrás: volver</span>
         </div>
       </div>
     );
@@ -158,12 +369,23 @@ export default function App({ service, store }: { service: AppService; store: Ap
 
   if (view === "manage") {
     return (
-      <CameraManagement
-        cameras={cameras}
-        service={service}
-        onCamerasChanged={refreshCameras}
-        onBack={() => setView("grid")}
-      />
+      <Suspense
+        fallback={(
+          <main className="camera-management" role="status">
+            Cargando administración…
+          </main>
+        )}
+      >
+        <CameraManagement
+          cameras={cameras}
+          service={service}
+          onCamerasChanged={refreshCameras}
+          onBack={() => {
+            restoreGridFocus.current = true;
+            setView("grid");
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -175,22 +397,41 @@ export default function App({ service, store }: { service: AppService; store: Ap
           {user?.role === "admin" && (
             <button type="button" onClick={() => setView("manage")}>Administrar cámaras</button>
           )}
-          <button type="button" onClick={() => { logout(); setView("login"); }}>Cerrar sesión</button>
+          <button type="button" onClick={() => void handleLogout()}>Cerrar sesión</button>
         </nav>
       </header>
       <div className="grid">
-        {cameras.map((c, i) => (
+        {visibleCameras.map((c, i) => {
+          const cameraIndex = currentPage * CAMERAS_PER_PAGE + i;
+          const streamState = streamStates[c.id];
+          const status = streamStatusLabel(c.enabled, streamState);
+          return (
           <CameraTile
             key={c.id}
-            index={i}
+            index={cameraIndex}
             name={c.name}
-            selected={i === selected}
+            enabled={c.enabled}
+            src={streamState?.hlsUrl}
+            status={status}
+            selected={cameraIndex === selected}
+            onRetry={c.enabled && (
+              streamState?.requestFailed
+              || streamState?.health?.status === "error"
+              || streamState?.playbackStatus === "error"
+            ) ? () => { void retryStream(c.id); } : undefined}
+            onPlaybackStatusChange={(playbackStatus) => {
+              setStreamStates((current) => ({
+                ...current,
+                [c.id]: { ...current[c.id], playbackStatus },
+              }));
+            }}
             onSelect={() => {
-              setSelected(i);
-              void openCamera(c.id);
+              setSelected(cameraIndex);
+              if (c.enabled) void openCamera(c.id);
             }}
           />
-        ))}
+          );
+        })}
         {cameras.length === 0 && (
           <div className="empty-cameras">
             <p>No hay cámaras registradas.</p>
@@ -202,8 +443,41 @@ export default function App({ service, store }: { service: AppService; store: Ap
           </div>
         )}
       </div>
+      {pageCount > 1 && (
+        <nav className="camera-pagination" aria-label="Páginas de cámaras">
+          <button
+            type="button"
+            onClick={() => {
+              const nextPage = Math.max(0, currentPage - 1);
+              restoreGridFocus.current = true;
+              setPage(nextPage);
+              setSelected(nextPage * CAMERAS_PER_PAGE);
+            }}
+            disabled={currentPage === 0}
+          >
+            Página anterior
+          </button>
+          <span>
+            Cámaras{" "}
+            {currentPage * CAMERAS_PER_PAGE + 1}–{Math.min((currentPage + 1) * CAMERAS_PER_PAGE, cameras.length)}
+            {" "}de {cameras.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const nextPage = Math.min(pageCount - 1, currentPage + 1);
+              restoreGridFocus.current = true;
+              setPage(nextPage);
+              setSelected(nextPage * CAMERAS_PER_PAGE);
+            }}
+            disabled={currentPage === pageCount - 1}
+          >
+            Página siguiente
+          </button>
+        </nav>
+      )}
       {error && <p className="error">{error}</p>}
-      <footer className="hint">Flechas: navegar · Enter: abrir · Esc: salir</footer>
+      <footer className="hint">Flechas: navegar · Enter: abrir · Selecciona una cámara para verla en pantalla completa</footer>
     </div>
   );
 }

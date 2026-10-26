@@ -33,11 +33,17 @@ test("camera management adapter sends authenticated CRUD and probe requests", as
   };
   const responses = [
     jsonResponse({ id: camera.id, username: "admin", role: "admin" }),
+    jsonResponse({
+      hlsUrl: `/streams/${camera.id}/index.m3u8`,
+      health: { status: "starting", restarts: 0 },
+    }),
+    jsonResponse({ status: "running", restarts: 0 }),
     jsonResponse(camera),
     jsonResponse({ ...camera, name: "Patio" }),
     jsonResponse({ ok: true, codecVideo: "h264", width: 1920, height: 1080 }),
     new Response(null, { status: 204 }),
     jsonResponse({ items: [] }),
+    new Response(null, { status: 204 }),
   ];
   const requests: Array<{ url: string; init: RequestInit }> = [];
   const originalFetch = globalThis.fetch;
@@ -51,6 +57,11 @@ test("camera management adapter sends authenticated CRUD and probe requests", as
   try {
     const gateway = new HttpAppGateway(createApiClient(new MemoryTokenStorage()));
     assert.deepEqual(await gateway.currentUser(), { id: camera.id, username: "admin", role: "admin" });
+    assert.deepEqual(await gateway.openStream(camera.id), {
+      hlsUrl: `/streams/${camera.id}/index.m3u8`,
+      health: { status: "starting", restarts: 0 },
+    });
+    assert.deepEqual(await gateway.cameraStreamHealth(camera.id), { status: "running", restarts: 0 });
 
     const created = await gateway.createCamera({
       name: "Entrada",
@@ -74,17 +85,21 @@ test("camera management adapter sends authenticated CRUD and probe requests", as
 
     await gateway.deleteCamera(camera.id);
     assert.deepEqual(await gateway.listCameras(), []);
+    await gateway.logout();
 
     assert.deepEqual(requests.map(({ url, init }) => [url, init.method ?? "GET"]), [
       ["/api/auth/me", "GET"],
+      [`/api/cameras/${camera.id}/stream`, "GET"],
+      [`/api/cameras/${camera.id}/health`, "GET"],
       ["/api/cameras", "POST"],
       [`/api/cameras/${camera.id}`, "PATCH"],
       [`/api/cameras/${camera.id}/probe`, "POST"],
       [`/api/cameras/${camera.id}`, "DELETE"],
       ["/api/cameras", "GET"],
+      ["/api/auth/logout", "POST"],
     ]);
     assert.equal(new Headers(requests[1]?.init.headers).get("Authorization"), "Bearer test-access-token");
-    assert.deepEqual(JSON.parse(String(requests[1]?.init.body)), {
+    assert.deepEqual(JSON.parse(String(requests[3]?.init.body)), {
       name: "Entrada",
       ip: "192.0.2.10",
       username: "camera-user",

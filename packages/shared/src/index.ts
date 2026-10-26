@@ -79,10 +79,22 @@ export const PtzSchema = z.object({
 });
 export type Ptz = z.infer<typeof PtzSchema>;
 
+export const CameraStreamStatusSchema = z.enum(["starting", "running", "stopped", "error"]);
+export type CameraStreamStatus = z.infer<typeof CameraStreamStatusSchema>;
+
 export const HealthSchema = z.object({
-  status: z.enum(["online", "offline", "connecting"]),
+  status: CameraStreamStatusSchema,
   fps: z.number().optional(),
   bitrate: z.number().optional(),
   lastFrameAt: z.string().datetime().optional(),
 });
 export type Health = z.infer<typeof HealthSchema>;
+
+export const CameraStreamHealthSchema = z.object({
+  status: CameraStreamStatusSchema,
+  pid: z.number().int().positive().optional(),
+  restarts: z.number().int().nonnegative(),
+  lastError: z.string().optional(),
+  startedAt: z.string().datetime().optional(),
+});
+export type CameraStreamHealth = z.infer<typeof CameraStreamHealthSchema>;
