@@ -4,6 +4,7 @@ import StreamPlayer from "./StreamPlayer.js";
 export type CameraPlaybackStatus = "loading" | "playing" | "error";
 
 interface Props {
+  id: string;
   index: number;
   name: string;
   enabled: boolean;
@@ -12,10 +13,14 @@ interface Props {
   selected: boolean;
   onSelect: () => void;
   onRetry?: () => void;
+  onMove?: (offset: -1 | 1) => void;
+  canMoveBefore?: boolean;
+  canMoveAfter?: boolean;
   onPlaybackStatusChange: (status: CameraPlaybackStatus) => void;
 }
 
 export default function CameraTile({
+  id,
   index,
   name,
   enabled,
@@ -24,6 +29,9 @@ export default function CameraTile({
   selected,
   onSelect,
   onRetry,
+  onMove,
+  canMoveBefore = false,
+  canMoveAfter = false,
   onPlaybackStatusChange,
 }: Props) {
   const statusClass = {
@@ -37,7 +45,7 @@ export default function CameraTile({
   }[status] ?? "unknown";
 
   return (
-    <div className="camera-tile-container">
+    <div className="camera-tile-container" data-camera-id={id}>
       <button
         className={`tile ${selected ? "selected" : ""}`}
         onClick={onSelect}
@@ -61,6 +69,30 @@ export default function CameraTile({
           {status}
         </span>
       </button>
+      {onMove && (
+        <div className="tile-order">
+          <button
+            type="button"
+            className="tile-move"
+            data-move="before"
+            disabled={!canMoveBefore}
+            onClick={() => onMove(-1)}
+            aria-label={`Mover ${name} a la izquierda`}
+          >
+            ◀ Izquierda
+          </button>
+          <button
+            type="button"
+            className="tile-move"
+            data-move="after"
+            disabled={!canMoveAfter}
+            onClick={() => onMove(1)}
+            aria-label={`Mover ${name} a la derecha`}
+          >
+            Derecha ▶
+          </button>
+        </div>
+      )}
       {onRetry && (
         <button
           type="button"
