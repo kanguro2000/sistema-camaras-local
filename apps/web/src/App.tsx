@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CameraStreamHealth } from "@sistema-camaras/shared";
 import { AppService } from "./application/services/app-service.js";
 import { AppStore } from "./store.js";
@@ -44,6 +44,8 @@ export default function App({ service, store }: { service: AppService; store: Ap
   const [streamStates, setStreamStates] = useState<Record<string, CameraStreamState>>({});
   const [fullId, setFullId] = useState<string | null>(null);
   const [fullSrc, setFullSrc] = useState<string | null>(null);
+  const restoreGridFocus = useRef(false);
+  const lastGridFocus = useRef<HTMLElement | null>(null);
   const pageCount = Math.max(1, Math.ceil(cameras.length / CAMERAS_PER_PAGE));
   const currentPage = Math.min(page, pageCount - 1);
   const visibleCameras = useMemo(
@@ -102,6 +104,7 @@ export default function App({ service, store }: { service: AppService; store: Ap
       .catch(() => {
         if (!active) return;
         logout();
+        lastGridFocus.current = null;
         setView("login");
         setError("La sesión expiró. Inicia sesión de nuevo.");
       });
@@ -171,8 +174,9 @@ export default function App({ service, store }: { service: AppService; store: Ap
     };
   }, [service, token, view, visibleCameras]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (view !== "grid" || !user) return;
+    if (lastGridFocus.current?.isConnected && !restoreGridFocus.current) return;
     const container = document.querySelector<HTMLElement>(".grid-view");
     if (!container) return;
     const selectedCamera = container.querySelector<HTMLButtonElement>(
@@ -181,8 +185,11 @@ export default function App({ service, store }: { service: AppService; store: Ap
     const firstCamera = container.querySelector<HTMLButtonElement>(".tile:not(:disabled)");
     const target = selectedCamera ?? firstCamera
       ?? container.querySelector<HTMLButtonElement>(".empty-cameras button");
-    target?.focus();
-  }, [cameras, page, selected, user, view]);
+    if (!target) return;
+    target.focus();
+    lastGridFocus.current = target;
+    restoreGridFocus.current = false;
+  }, [cameras.length, page, selected, user, view]);
 
   useEffect(() => {
     if (view !== "grid") return;
@@ -211,6 +218,7 @@ export default function App({ service, store }: { service: AppService; store: Ap
     const handler = (e: KeyboardEvent) => {
       if (isRemoteBackKey(e)) {
         e.preventDefault();
+        restoreGridFocus.current = true;
         setView("grid");
         setFullId(null);
         setFullSrc(null);
@@ -283,7 +291,10 @@ export default function App({ service, store }: { service: AppService; store: Ap
         cameras={cameras}
         service={service}
         onCamerasChanged={refreshCameras}
-        onBack={() => setView("grid")}
+        onBack={() => {
+          restoreGridFocus.current = true;
+          setView("grid");
+        }}
       />
     );
   }
@@ -296,7 +307,11 @@ export default function App({ service, store }: { service: AppService; store: Ap
           {user?.role === "admin" && (
             <button type="button" onClick={() => setView("manage")}>Administrar cámaras</button>
           )}
-          <button type="button" onClick={() => { logout(); setView("login"); }}>Cerrar sesión</button>
+          <button type="button" onClick={() => {
+            logout();
+            lastGridFocus.current = null;
+            setView("login");
+          }}>Cerrar sesión</button>
         </nav>
       </header>
       <div className="grid">
@@ -348,6 +363,7 @@ export default function App({ service, store }: { service: AppService; store: Ap
             type="button"
             onClick={() => {
               const nextPage = Math.max(0, currentPage - 1);
+              restoreGridFocus.current = true;
               setPage(nextPage);
               setSelected(nextPage * CAMERAS_PER_PAGE);
             }}
@@ -364,6 +380,7 @@ export default function App({ service, store }: { service: AppService; store: Ap
             type="button"
             onClick={() => {
               const nextPage = Math.min(pageCount - 1, currentPage + 1);
+              restoreGridFocus.current = true;
               setPage(nextPage);
               setSelected(nextPage * CAMERAS_PER_PAGE);
             }}

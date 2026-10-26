@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CameraProbeResult } from "@sistema-camaras/shared";
 import type { AppService } from "../application/services/app-service.js";
 import type { Camera, CameraCreateInput, CameraUpdateInput } from "../domain/entities/camera.js";
@@ -57,6 +57,7 @@ export default function CameraManagement({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const formReturnFocus = useRef<HTMLElement | null>(null);
+  const formInitialFocus = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -81,8 +82,11 @@ export default function CameraManagement({
     return () => window.removeEventListener("keydown", handler);
   }, [formOpen, onBack, pendingDelete]);
 
-  useEffect(() => {
-    if (formOpen) return;
+  useLayoutEffect(() => {
+    if (formOpen) {
+      formInitialFocus.current?.focus();
+      return;
+    }
     if (formReturnFocus.current?.isConnected) formReturnFocus.current.focus();
     formReturnFocus.current = null;
   }, [formOpen]);
@@ -259,6 +263,7 @@ export default function CameraManagement({
             <label>
               Nombre
               <input
+                ref={formInitialFocus}
                 required
                 maxLength={64}
                 value={form.name}
