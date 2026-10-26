@@ -42,6 +42,13 @@ El script instala Docker y Compose si hacen falta, habilita Docker, crea
 `<raíz-del-repositorio>/.env` si no existe, prepara `data/`, construye las
 imágenes e inicia los servicios. Al final consulta `http://localhost:8080/api/health`.
 
+Al volver a ejecutar el instalador, un `.env` existente se conserva: no se
+regenera (para no perder `MASTER_KEY`) y el script lo indica con su ruta. Si el
+archivo no tiene `JWT_SECRET` o `MASTER_KEY`, el script se detiene con un
+mensaje en lugar de levantar un gateway que no arrancaría. Si buscabas un
+`.env` nuevo, revisa primero `<raíz-del-repositorio>/.env`; un archivo creado
+con `pnpm secrets` desde otro directorio no es el que usa Docker Compose.
+
 El generador se niega a sobrescribir un `.env` existente. Si se ejecuta
 manualmente desde la raíz, genera el archivo allí:
 
