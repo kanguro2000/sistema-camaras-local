@@ -187,11 +187,7 @@ jobs:
 
   publish-images:
     if: github.event_name == 'push'
-<<<<<<< HEAD
-    needs: [validate, e2e, deploy-checks]
-=======
-    needs: [validate, deploy-checks, rtsp-integration]
->>>>>>> origin/develop
+    needs: [validate, e2e, deploy-checks, rtsp-integration]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -239,11 +235,7 @@ jobs:
 
   promote:
     if: github.event_name == 'push' && (github.ref_name == 'develop' || github.ref_name == 'staging')
-<<<<<<< HEAD
-    needs: [validate, e2e, deploy-checks]
-=======
-    needs: [validate, deploy-checks, rtsp-integration]
->>>>>>> origin/develop
+    needs: [validate, e2e, deploy-checks, rtsp-integration]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

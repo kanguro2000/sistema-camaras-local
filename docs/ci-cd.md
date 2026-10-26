@@ -31,10 +31,7 @@ Reglas:
 | `publish-images` | Solo push (tras fusionar) a las tres ramas | Publica `gateway` y `web` en GHCR con la etiqueta del ambiente y `sha-<commit>`.     |
 | `promote`        | Push a `develop` o `staging`               | Abre el PR de promoción a la rama siguiente si hay cambios y no existe uno abierto.  |
 
-<<<<<<< HEAD
-`publish-images` y `promote` solo se ejecutan si `validate`, `e2e` y `deploy-checks` pasan.
-=======
-`publish-images` y `promote` solo se ejecutan si `validate`, `deploy-checks` y `rtsp-integration` pasan.
+`publish-images` y `promote` solo se ejecutan si `validate`, `e2e`, `deploy-checks` y `rtsp-integration` pasan.
 
 ### Prueba con cámara RTSP simulada
 
@@ -46,7 +43,6 @@ RTSP_INTEGRATION=1 pnpm test:rtsp
 ```
 
 Sin `RTSP_INTEGRATION=1` las pruebas se omiten, por lo que `pnpm test` sigue sin requerir FFmpeg.
->>>>>>> origin/develop
 
 ### Seguridad y calidad
 
