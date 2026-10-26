@@ -31,6 +31,12 @@ Reglas:
 
 `publish-images` y `promote` solo se ejecutan si `validate` y `deploy-checks` pasan.
 
+### Seguridad y calidad
+
+- `validate` ejecuta `pnpm audit --prod --audit-level=high` (falla con vulnerabilidades altas o críticas) y publica la cobertura de pruebas unitarias (`pnpm test:coverage`) en el resumen del job.
+- `deploy-checks` escanea con Trivy las imágenes `gateway` y `web` y falla ante vulnerabilidades CRITICAL con corrección disponible.
+- `.github/workflows/codeql.yml` analiza el código con CodeQL en cada PR, push y cada lunes. Los resultados aparecen en Security → Code scanning.
+
 ## 3. Imágenes y despliegue manual
 
 Las imágenes se publican en:

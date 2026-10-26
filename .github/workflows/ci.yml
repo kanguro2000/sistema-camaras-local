@@ -55,6 +55,16 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Auditar dependencias de producción
+        run: pnpm audit --prod --audit-level=high
+      - name: Medir cobertura de pruebas unitarias
+        run: |
+          {
+            echo "## Cobertura de pruebas unitarias"
+            echo '```'
+            pnpm test:coverage 2>&1 | grep -E "test:coverage: ℹ (all files|file )|^(packages|apps)/.*all files" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Subir reportes de Playwright
         if: failure()
         uses: actions/upload-artifact@v7
@@ -81,6 +91,20 @@ jobs:
         run: docker build -f deploy/Dockerfile --target gateway -t sistema-camaras-gateway:ci .
       - name: Construir imagen web
         run: docker build -f deploy/Dockerfile --target web -t sistema-camaras-web:ci .
+      - name: Escanear vulnerabilidades en la imagen del gateway
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sistema-camaras-gateway:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Escanear vulnerabilidades en la imagen web
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sistema-camaras-web:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
 
   publish-images:
     if: github.event_name == 'push'
