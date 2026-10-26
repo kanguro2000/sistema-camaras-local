@@ -9,6 +9,7 @@ Visualización en vivo de cámaras TP-Link Tapo en TVs Hisense (Vidaa) y TCL (An
 - `AGENTS.md` — guía para agentes de código.
 - `specs/` — especificaciones técnicas.
 - [`docs/operations-runbook.md`](docs/operations-runbook.md) — comandos de operación, respaldos y solución de problemas.
+- [`docs/ci-cd.md`](docs/ci-cd.md) — flujo de ramas (`develop` → `staging` → `master`), CI/CD e imágenes.
 - `skills/` — skills para agentes.
 
 ## Inicio rápido (desarrollo)
