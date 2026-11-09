@@ -14,14 +14,14 @@
     "test:integration": "tsx --test src/infrastructure/media/rtsp-camera.integration.test.ts"
   },
   "dependencies": {
-    "@fastify/cors": "^11.3.1",
+    "@fastify/cors": "^11.4.1",
     "@fastify/helmet": "^13.2.0",
-    "@fastify/rate-limit": "^11.2.1",
-    "@fastify/static": "^10.1.7",
+    "@fastify/rate-limit": "^11.2.2",
+    "@fastify/static": "^10.1.10",
     "@sistema-camaras/shared": "workspace:*",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.0",
-    "fastify": "^5.12.7",
+    "fastify": "^5.12.8",
     "jsonwebtoken": "^9.0.2",
     "zod": "^4.6.7"
   },
